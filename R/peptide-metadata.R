@@ -12,8 +12,8 @@ get_peptide_meta <- function(force_refresh = FALSE) {
   rlang::check_installed(c("duckdb", "DBI", "dplyr", "withr"))
 
   # 1. Prep cache dir & DuckDB connection
-  cache_dir <- tools::R_user_dir("phiper", "cache")
-  if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE)
+  # a throw-away directory that vanishes when the calling environment ends
+  cache_dir   <- withr::local_tempdir("phiper_cache")   # optional name-prefix
   duckdb_file <- file.path(cache_dir, "phip_cache.duckdb")
   con <- DBI::dbConnect(duckdb::duckdb(), dbdir = duckdb_file)
 
@@ -32,7 +32,7 @@ get_peptide_meta <- function(force_refresh = FALSE) {
     "combined_libraries_with_lineages_important_info_nonAAseq.rds"
   )
   tmp <- tempfile(fileext = ".rds")
-  sha <- "f3282d90f81f2821a395285c7ef3dfb6fa114aa7043ee777f83c5958cf8ba3b1"
+  sha <- "177a72117993becb19f0109bb450b700f9a3749dc2cdab23ebdeb97f26b15f4c"
 
   message("Downloading peptide metadata...")
 
@@ -71,7 +71,7 @@ get_peptide_meta <- function(force_refresh = FALSE) {
 
     # 2) character "TRUE"/"FALSE" --> logical
     if (is.character(col) &&
-      all(tolower(col[!is.na(col)]) %in% c("true", "false", NA))) {
+        all(tolower(col[!is.na(col)]) %in% c("true", "false", NA))) {
       return(as.logical(col))
     }
 
@@ -88,8 +88,8 @@ get_peptide_meta <- function(force_refresh = FALSE) {
       # only proceed if all non-NA entries are numeric strings
       # and not all of them are "0" or "1"
       if (length(non_na) > 0 &&
-        all(is_num_str) &&
-        !all(non_na %in% c("0", "1"))
+          all(is_num_str) &&
+          !all(non_na %in% c("0", "1"))
       ) {
         return(suppressWarnings(as.numeric(col)))
       }
@@ -134,9 +134,9 @@ get_peptide_meta <- function(force_refresh = FALSE) {
   for (m in methods) {
     status <- tryCatch(
       utils::download.file(url, dest,
-        mode   = "wb",
-        quiet  = TRUE,
-        method = if (nzchar(m)) m else getOption("download.file.method")
+                           mode   = "wb",
+                           quiet  = TRUE,
+                           method = if (nzchar(m)) m else getOption("download.file.method")
       ),
       error = function(e) e,
       warning = function(w) w
@@ -163,7 +163,7 @@ get_peptide_meta <- function(force_refresh = FALSE) {
     )
 
     if (is.na(sha_actual) ||
-      !identical(tolower(sha_actual), tolower(sha_expected))) {
+        !identical(tolower(sha_actual), tolower(sha_expected))) {
       cli::cli_warn(
         c("!" = paste0(
           "Checksum mismatch: expected {.val {sha_expected}},",
