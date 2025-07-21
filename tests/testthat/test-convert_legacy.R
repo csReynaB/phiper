@@ -1,5 +1,7 @@
 # testing the legacy workflow for loading the data from separate files
 test_that("convert legacy: memory", {
+  withr::with_message_sink(tempfile(),
+  withr::with_options(list(warn = -1), {
   ## test the .yaml file interface
   withr::with_tempdir({
     path <- file.path(
@@ -9,19 +11,19 @@ test_that("convert legacy: memory", {
 
     ## SMOKE TEST --------------------------------------------------------------
     ### memory
-    expect_no_error(suppressWarnings(
+    expect_no_error(
       phip_convert_legacy(
         config_yaml = path,
         backend = "memory"
       )
-    ))
+    )
 
-    ### with explicit paths, without config file, minimal example run
-    expect_no_error(suppressWarnings(
+    ### with explicit paths, without config file, .parquet handling
+    expect_no_error(
       phip_convert_legacy(
         exist_file = file.path(
           system.file("extdata", package = "phiper"),
-          "exist.csv"
+          "exist.parquet"
         ),
         samples_file = file.path(
           system.file("extdata", package = "phiper"),
@@ -33,19 +35,74 @@ test_that("convert legacy: memory", {
         ),
         backend = "memory"
       )
-    ))
+    )
 
     ### error when no required file present
-    expect_error(suppressWarnings(
+    expect_error(
       phip_convert_legacy(
         exist_file = file.path(
           system.file("extdata", package = "phiper"),
           "exist.csv"
         ),
         backend = "memory"
+      ), "samples_file")
+
+    ### fold_change and raw counts handling
+    expect_no_error(
+      phip_convert_legacy(
+        exist_file = file.path(
+          system.file("extdata", package = "phiper"),
+          "exist.parquet"
+        ),
+        fold_change_file = file.path(
+          system.file("extdata", package = "phiper"),
+          "fold_change.csv"
+        ),
+        samples_file = file.path(
+          system.file("extdata", package = "phiper"),
+          "samples_meta.csv"
+        ),
+        input_file = file.path(
+          system.file("extdata", package = "phiper"),
+          "raw_input.csv"
+        ),
+        hit_file = file.path(
+          system.file("extdata", package = "phiper"),
+          "raw_hit.csv"
+        ),
+        backend = "memory"
       )
-    ), "samples_file")
+    )
+
+    expect_no_error(
+      phip_convert_legacy(
+        exist_file = file.path(
+          system.file("extdata", package = "phiper"),
+          "exist.parquet"
+        ),
+        fold_change_file = file.path(
+          system.file("extdata", package = "phiper"),
+          "fold_change.csv"
+        ),
+        samples_file = file.path(
+          system.file("extdata", package = "phiper"),
+          "samples_meta.csv"
+        ),
+        input_file = file.path(
+          system.file("extdata", package = "phiper"),
+          "raw_input.csv"
+        ),
+        hit_file = file.path(
+          system.file("extdata", package = "phiper"),
+          "raw_hit.csv"
+        ),
+        backend = "duckdb"
+      )
+    )
+
+
   })
+  }))
 })
 
 ## testing the other backends; as these are "soft" dependencies, skip them if
@@ -56,6 +113,8 @@ skip_if_not_installed("arrow")
 skip_if_not_installed("dbplyr")
 
 test_that("convert legacy: duckdb and arrow", {
+  withr::with_message_sink(tempfile(),
+                           withr::with_options(list(warn = -1), {
   ## test the .yaml file interface
   withr::with_tempdir({
     path <- file.path(
@@ -64,27 +123,27 @@ test_that("convert legacy: duckdb and arrow", {
     )
     ## SMOKE TESTS -------------------------------------------------------------
     ### default backend ("duckdb")
-    expect_no_error(suppressWarnings(
+    expect_no_error(
       phip_convert_legacy(
         config_yaml = path
       )
-    ))
+    )
 
     ### duckdb explicitly
-    expect_no_error(suppressWarnings(
+    expect_no_error(
       phip_convert_legacy(
         config_yaml = path,
         backend = "duckdb"
       )
-    ))
+    )
 
     ### arrow
-    expect_no_error(suppressWarnings(
+    expect_no_error(
       phip_convert_legacy(
         config_yaml = path,
         backend = "arrow"
       )
-    ))
+    )
 
     ### works without extra_cols -----------------------------------------------
     # ------------------------------------------------------------------#
@@ -135,24 +194,24 @@ test_that("convert legacy: duckdb and arrow", {
     # ------------------------------------------------------------------#
     # 5. Call the converter
     # ------------------------------------------------------------------#
-    suppressWarnings({
       pd <- phip_convert_legacy(
         config_yaml = yaml_dst,
         backend     = "duckdb"
       )
-    })
+
 
     # ------------------------------------------------------------------#
     # 6. Expectations
     # ------------------------------------------------------------------#
     expect_s3_class(pd, "phip_data")
     expect_gt(ncol(get_counts(pd)), 3) # additional columns from meta,
+
     # as there is no extra_cols
     expect_false(isTRUE(pd$meta$fold_change))
     expect_false(isTRUE(pd$meta$longitudinal))
   })
+                           }))
 })
-
 
 ## .auto_read
 tmp_csv <- withr::local_tempfile(fileext = ".csv")
