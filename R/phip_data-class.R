@@ -574,13 +574,8 @@ validate_phip_data <- function(x,
   if (have$raw_counts) {
     prop_zero <- tbl |>
       dplyr::summarise(
-<<<<<<< HEAD
-        p = sum(dplyr::if_else(.data$counts_control == 0 &
-          .data$counts_hit == 0, 1, 0)) /
-=======
         p = sum(dplyr::if_else(.data$input_count == 0 &
                                  .data$hit_count == 0, 1, 0)) /
->>>>>>> 964813b (Updated validation rules)
           dplyr::n()
       ) |>
       dplyr::pull(.data$p)
