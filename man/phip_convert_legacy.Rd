@@ -8,6 +8,8 @@ phip_convert_legacy(
   exist_file = NULL,
   fold_change_file = NULL,
   samples_file = NULL,
+  input_file = NULL,
+  hit_file = NULL,
   timepoints_file = NULL,
   extra_cols = NULL,
   comparisons_file = NULL,
@@ -25,6 +27,9 @@ sample numeric matrix). \emph{Required unless given in \code{config_yaml}.}}
 
 \item{samples_file}{Path to the \strong{samples} CSV (sample metadata).
 \emph{Required unless given in \code{config_yaml}.}}
+
+\item{input_file, hit_file}{Paths to the \strong{raw_counts} CSV (peptide x
+sample integer matrix). \emph{Required unless given in \code{config_yaml}.}}
 
 \item{timepoints_file}{Path to the \strong{timepoints} CSV (subject <-> sample
 mapping). Optional for cross-sectional data.}

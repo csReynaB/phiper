@@ -39,6 +39,8 @@
 #'   matrix). *Required unless given in `config_yaml`.*
 #' @param fold_change_file       Path to the **fold_change** CSV (peptide x
 #'   sample numeric matrix). *Required unless given in `config_yaml`.*
+#' @param input_file,hit_file    Paths to the **raw_counts** CSV (peptide x
+#'   sample integer matrix). *Required unless given in `config_yaml`.*
 #' @param samples_file     Path to the **samples** CSV (sample metadata).
 #'   *Required unless given in `config_yaml`.*
 #' @param timepoints_file  Path to the **timepoints** CSV (subject <-> sample

@@ -19,7 +19,7 @@
 #'
 #' @param exist_file,fold_change_file,input_file,hit_file,samples_file,timepoints_file,comparisons_file
 #'  Character paths (relative or absolute) to the respective CSV/Parquet inputs.
-#'  `NULL` means “not supplied”.
+#'  `NULL` means "not supplied".
 #' @param extra_cols Character vector of extra metadata columns to keep; may be
 #'   `NULL`.
 #' @param output_dir Ignored (soft-deprecated).
@@ -177,19 +177,15 @@
   )
 
   #  rule 2: at least one matrix source present -------------------------
-  all_null <- with(cfg, is.null(exist_file) &&
-    is.null(fold_change_file) &&
-    is.null(input_file) &&
-    is.null(hit_file))
-  .chk_cond(
-    all_null,
-    paste0(
-      "Supply at least one of:\n",
-      "  • 'exist_file'\n",
-      "  • 'fold_change_file'\n",
-      "  • both 'input_file' and 'hit_file'"
-    )
-  )
+  all_null <- with(cfg, is.null(exist_file)  &&
+                     is.null(fold_change_file) &&
+                     is.null(input_file) &&
+                     is.null(hit_file))
+  .chk_cond(all_null,
+            paste0("Supply at least one of:\n",
+                   "  * 'exist_file'\n",
+                   "  * 'fold_change_file'\n",
+                   "  * both 'input_file' and 'hit_file'"))
 
   #  deprecation notice -------------------------------------------------
   .chk_cond(!is.null(cfg$output_dir),
