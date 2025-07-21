@@ -113,11 +113,9 @@ new_phip_data <- function(data_long,
   }
 
   # pick the correct column ----------------------------------------------
-  sample_dim <- if (meta$longitudinal) "sample_id" else "subject_id"
-
   meta$full_cross <- is_full_cross(data_long,
     peptide = "peptide_id",
-    sample  = sample_dim
+    sample  = "sample_id"
   )
 
   # --------------------------------------------------------------------------
@@ -431,6 +429,7 @@ validate_phip_data <- function(x,
                                na_warn_thresh = 0.50, # warn if >50 % NA / zero
                                auto_expand = TRUE) { # fill missing grid?
   .check_pd(x) # existing helper
+  .data <- rlang::.data # to silence the lintr and R CMD CHECK
 
   tbl <- x$data_long
   cols <- colnames(tbl)
@@ -445,7 +444,7 @@ validate_phip_data <- function(x,
   need <- if (is_long) {
     c("subject_id", "timepoint", "sample_id", "peptide_id")
   } else {
-    c("subject_id", "peptide_id")
+    c("sample_id", "peptide_id")
   }
 
   miss <- setdiff(need, cols)
@@ -457,11 +456,21 @@ validate_phip_data <- function(x,
     )
   )
 
+  # quick validate if at least two rows in the data
+  n_rows <- tbl |>
+    dplyr::summarise(n = dplyr::n()) |>
+    dplyr::pull(.data$n)
+
+  .chk_cond(
+    n_rows < 1,
+    "The `data_long` has no rows! No peptides and/or subjects are specified."
+  )
+
   ## ---------------------------------------------- 2  OUTCOME FAMILY
   have <- list(
     present     = "present" %in% cols,
     fold_change = "fold_change" %in% cols,
-    raw_counts  = all(c("counts_control", "counts_hit") %in% cols)
+    raw_counts  = all(c("input_count", "hit_count") %in% cols)
   )
   k <- sum(unlist(have))
   .chk_cond(
@@ -502,7 +511,7 @@ validate_phip_data <- function(x,
   )
 
   ## --------------------------------------------- 5  UNIQUENESS
-  .data <- rlang::.data # to silence the lintr and R CMD CHECK
+
   if (is_long) {
     dup <- tbl |>
       dplyr::count(.data$subject_id, .data$timepoint, .data$peptide_id) |>
@@ -516,7 +525,7 @@ validate_phip_data <- function(x,
     )
   } else {
     dup <- tbl |>
-      dplyr::count(.data$subject_id, .data$peptide_id) |>
+      dplyr::count(.data$sample_id, .data$peptide_id) |>
       dplyr::filter(.data$n > 1) |>
       utils::head(1) |>
       dplyr::collect()
@@ -534,6 +543,8 @@ validate_phip_data <- function(x,
 
   if (have$fold_change) {
     ok <- tbl |>
+      # multiply by 1.0 to coerce integer --> double in the SQL
+      dplyr::mutate(fold_change = .data$fold_change * 1.0) |>
       dplyr::summarise(all_finite = all(is.finite(.data$fold_change))) |>
       dplyr::pull(.data$all_finite)
     .chk_cond(!ok, "`fold_change` contains Inf/-Inf or NA.")
@@ -541,7 +552,7 @@ validate_phip_data <- function(x,
 
   if (have$raw_counts) {
     neg <- tbl |>
-      dplyr::filter(.data$counts_control < 0 | .data$counts_hit < 0) |>
+      dplyr::filter(.data$input_count < 0 | .data$hit_count < 0) |>
       utils::head(1) |>
       dplyr::collect()
     .chk_cond(nrow(neg) > 0, "Raw counts must be non-negative.")
@@ -563,8 +574,13 @@ validate_phip_data <- function(x,
   if (have$raw_counts) {
     prop_zero <- tbl |>
       dplyr::summarise(
+<<<<<<< HEAD
         p = sum(dplyr::if_else(.data$counts_control == 0 &
           .data$counts_hit == 0, 1, 0)) /
+=======
+        p = sum(dplyr::if_else(.data$input_count == 0 &
+                                 .data$hit_count == 0, 1, 0)) /
+>>>>>>> 964813b (Updated validation rules)
           dplyr::n()
       ) |>
       dplyr::pull(.data$p)
@@ -639,15 +655,10 @@ validate_phip_data <- function(x,
   }
 
   ## ---------------------------------------------- 10 FULL GRID
-  # decide which column indexes samples / subjects
-  # decide which column indexes samples / subjects
-  sample_dim <- if (is_long) "sample_id" else "subject_id"
-  sample_sym <- rlang::sym(sample_dim) # <- turn into a symbol
-
   dims <- tbl |>
     dplyr::summarise(
       n_pep = dplyr::n_distinct(.data$peptide_id),
-      n_smp = dplyr::n_distinct(!!sample_sym), # tidy-eval here
+      n_smp = dplyr::n_distinct(.data$sample_id),
       n_obs = dplyr::n()
     ) |>
     dplyr::collect()
@@ -683,7 +694,7 @@ validate_phip_data <- function(x,
       full_grid <- dplyr::as_tibble(full_grid)
 
       tbl <- full_grid |> dplyr::left_join(tbl,
-        by = c("sample_id", "peptide_id")
+                                           by = c("sample_id", "peptide_id")
       )
       x$data_long <- tbl
       x$meta$full_cross <- FALSE
