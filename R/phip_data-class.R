@@ -575,7 +575,7 @@ validate_phip_data <- function(x,
     prop_zero <- tbl |>
       dplyr::summarise(
         p = sum(dplyr::if_else(.data$input_count == 0 &
-                                 .data$hit_count == 0, 1, 0)) /
+          .data$hit_count == 0, 1, 0)) /
           dplyr::n()
       ) |>
       dplyr::pull(.data$p)
@@ -689,7 +689,7 @@ validate_phip_data <- function(x,
       full_grid <- dplyr::as_tibble(full_grid)
 
       tbl <- full_grid |> dplyr::left_join(tbl,
-                                           by = c("sample_id", "peptide_id")
+        by = c("sample_id", "peptide_id")
       )
       x$data_long <- tbl
       x$meta$full_cross <- FALSE

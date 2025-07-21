@@ -85,17 +85,17 @@
 #' @export
 
 phip_convert_legacy <- function(
-    exist_file         = NULL,
-    fold_change_file   = NULL,
-    samples_file       = NULL,
-    input_file         = NULL,
-    hit_file           = NULL,
-    timepoints_file    = NULL,
-    extra_cols         = NULL,
-    comparisons_file   = NULL,
-    output_dir         = NULL, # hard deprecation
-    backend            = NULL,
-    config_yaml        = NULL) {
+    exist_file = NULL,
+    fold_change_file = NULL,
+    samples_file = NULL,
+    input_file = NULL,
+    hit_file = NULL,
+    timepoints_file = NULL,
+    extra_cols = NULL,
+    comparisons_file = NULL,
+    output_dir = NULL, # hard deprecation
+    backend = NULL,
+    config_yaml = NULL) {
   #' @importFrom rlang .data
 
   # ------------------------------------------------------------------
@@ -112,33 +112,35 @@ phip_convert_legacy <- function(
   # ------------------------------------------------------------------
   # 2. resolving the paths to absolute
   # ------------------------------------------------------------------
-  cfg <- .resolve_paths(exist_file,
-                        fold_change_file,
-                        samples_file,
-                        input_file,
-                        hit_file,
-                        timepoints_file,
-                        extra_cols,
-                        comparisons_file,
-                        output_dir,
-                        backend,
-                        config_yaml)
+  cfg <- .resolve_paths(
+    exist_file,
+    fold_change_file,
+    samples_file,
+    input_file,
+    hit_file,
+    timepoints_file,
+    extra_cols,
+    comparisons_file,
+    output_dir,
+    backend,
+    config_yaml
+  )
 
   # ------------------------------------------------------------------
   # 3. prepare the metadata
   # ------------------------------------------------------------------
-  meta_list <- .legacy_prepare_metadata(cfg$samples_file,
-                                        cfg$comparisons_file,
-                                        cfg$timepoints_file,
-                                        cfg$extra_cols)
+  meta_list <- .legacy_prepare_metadata(
+    cfg$samples_file,
+    cfg$comparisons_file,
+    cfg$timepoints_file,
+    cfg$extra_cols
+  )
 
   # ------------------------------------------------------------------
   # 3. create the phip_data object with different backends
   # ------------------------------------------------------------------
   if (backend == "memory") {
-
     .read_memory_backend(cfg, meta_list) ## already registers phip_data object
-
   } else if (backend == "duckdb") {
     # using the helper (a lot of code is repeated in duckdb and arrow, so i
     # decided to export it into a separate internale helper to reuse it)
@@ -147,8 +149,9 @@ phip_convert_legacy <- function(
     ## duckdb-specific code
     long <- dplyr::tbl(con, "final_long")
 
-    comps <- if (DBI::dbExistsTable(con, "comparisons"))
+    comps <- if (DBI::dbExistsTable(con, "comparisons")) {
       dplyr::tbl(con, "comparisons") |> dplyr::collect()
+    }
 
     # returning the phip_data object
     new_phip_data(
@@ -157,7 +160,6 @@ phip_convert_legacy <- function(
       backend     = "duckdb",
       meta        = list(con = con)
     )
-
   } else if (backend == "arrow") {
     ## check dependency
     rlang::check_installed(c("arrow"), reason = "arrow backend")
@@ -167,8 +169,10 @@ phip_convert_legacy <- function(
 
     # arrow-specific code, create tempdir to store the data
     arrow_dir <- withr::local_tempdir(
-      pattern = sprintf("phip_arrow_%s_",
-                        format(Sys.time(), "%Y%m%d%H%M%OS6")),
+      pattern = sprintf(
+        "phip_arrow_%s_",
+        format(Sys.time(), "%Y%m%d%H%M%OS6")
+      ),
       .local_envir = parent.frame()
     )
 
@@ -182,9 +186,10 @@ phip_convert_legacy <- function(
     )
 
     # open as arrow dataset
-    long  <- arrow::open_dataset(arrow_dir)
-    comps <- if (DBI::dbExistsTable(con, "comparisons"))
+    long <- arrow::open_dataset(arrow_dir)
+    comps <- if (DBI::dbExistsTable(con, "comparisons")) {
       dplyr::tbl(con, "comparisons") |> dplyr::collect()
+    }
 
     # returning the phip_data object
     new_phip_data(

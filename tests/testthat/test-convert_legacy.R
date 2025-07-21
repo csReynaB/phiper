@@ -1,108 +1,109 @@
 # testing the legacy workflow for loading the data from separate files
 test_that("convert legacy: memory", {
-  withr::with_message_sink(tempfile(),
-  withr::with_options(list(warn = -1), {
-  ## test the .yaml file interface
-  withr::with_tempdir({
-    path <- file.path(
-      system.file("extdata", package = "phiper"),
-      "config.yaml"
-    )
+  withr::with_message_sink(
+    tempfile(),
+    withr::with_options(list(warn = -1), {
+      ## test the .yaml file interface
+      withr::with_tempdir({
+        path <- file.path(
+          system.file("extdata", package = "phiper"),
+          "config.yaml"
+        )
 
-    ## SMOKE TEST --------------------------------------------------------------
-    ### memory
-    expect_no_error(
-      phip_convert_legacy(
-        config_yaml = path,
-        backend = "memory"
-      )
-    )
+        ## SMOKE TEST --------------------------------------------------------------
+        ### memory
+        expect_no_error(
+          phip_convert_legacy(
+            config_yaml = path,
+            backend = "memory"
+          )
+        )
 
-    ### with explicit paths, without config file, .parquet handling
-    expect_no_error(
-      phip_convert_legacy(
-        exist_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "exist.parquet"
-        ),
-        samples_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "samples_meta.csv"
-        ),
-        comparisons_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "comparisons.csv"
-        ),
-        backend = "memory"
-      )
-    )
+        ### with explicit paths, without config file, .parquet handling
+        expect_no_error(
+          phip_convert_legacy(
+            exist_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "exist.parquet"
+            ),
+            samples_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "samples_meta.csv"
+            ),
+            comparisons_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "comparisons.csv"
+            ),
+            backend = "memory"
+          )
+        )
 
-    ### error when no required file present
-    expect_error(
-      phip_convert_legacy(
-        exist_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "exist.csv"
-        ),
-        backend = "memory"
-      ), "samples_file")
+        ### error when no required file present
+        expect_error(
+          phip_convert_legacy(
+            exist_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "exist.csv"
+            ),
+            backend = "memory"
+          ), "samples_file"
+        )
 
-    ### fold_change and raw counts handling
-    expect_no_error(
-      phip_convert_legacy(
-        exist_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "exist.parquet"
-        ),
-        fold_change_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "fold_change.csv"
-        ),
-        samples_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "samples_meta.csv"
-        ),
-        input_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "raw_input.csv"
-        ),
-        hit_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "raw_hit.csv"
-        ),
-        backend = "memory"
-      )
-    )
+        ### fold_change and raw counts handling
+        expect_no_error(
+          phip_convert_legacy(
+            exist_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "exist.parquet"
+            ),
+            fold_change_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "fold_change.csv"
+            ),
+            samples_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "samples_meta.csv"
+            ),
+            input_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "raw_input.csv"
+            ),
+            hit_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "raw_hit.csv"
+            ),
+            backend = "memory"
+          )
+        )
 
-    expect_no_error(
-      phip_convert_legacy(
-        exist_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "exist.parquet"
-        ),
-        fold_change_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "fold_change.csv"
-        ),
-        samples_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "samples_meta.csv"
-        ),
-        input_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "raw_input.csv"
-        ),
-        hit_file = file.path(
-          system.file("extdata", package = "phiper"),
-          "raw_hit.csv"
-        ),
-        backend = "duckdb"
-      )
-    )
-
-
-  })
-  }))
+        expect_no_error(
+          phip_convert_legacy(
+            exist_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "exist.parquet"
+            ),
+            fold_change_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "fold_change.csv"
+            ),
+            samples_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "samples_meta.csv"
+            ),
+            input_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "raw_input.csv"
+            ),
+            hit_file = file.path(
+              system.file("extdata", package = "phiper"),
+              "raw_hit.csv"
+            ),
+            backend = "duckdb"
+          )
+        )
+      })
+    })
+  )
 })
 
 ## testing the other backends; as these are "soft" dependencies, skip them if
@@ -113,104 +114,106 @@ skip_if_not_installed("arrow")
 skip_if_not_installed("dbplyr")
 
 test_that("convert legacy: duckdb and arrow", {
-  withr::with_message_sink(tempfile(),
-                           withr::with_options(list(warn = -1), {
-  ## test the .yaml file interface
-  withr::with_tempdir({
-    path <- file.path(
-      system.file("extdata", package = "phiper"),
-      "config.yaml"
-    )
-    ## SMOKE TESTS -------------------------------------------------------------
-    ### default backend ("duckdb")
-    expect_no_error(
-      phip_convert_legacy(
-        config_yaml = path
-      )
-    )
+  withr::with_message_sink(
+    tempfile(),
+    withr::with_options(list(warn = -1), {
+      ## test the .yaml file interface
+      withr::with_tempdir({
+        path <- file.path(
+          system.file("extdata", package = "phiper"),
+          "config.yaml"
+        )
+        ## SMOKE TESTS -------------------------------------------------------------
+        ### default backend ("duckdb")
+        expect_no_error(
+          phip_convert_legacy(
+            config_yaml = path
+          )
+        )
 
-    ### duckdb explicitly
-    expect_no_error(
-      phip_convert_legacy(
-        config_yaml = path,
-        backend = "duckdb"
-      )
-    )
+        ### duckdb explicitly
+        expect_no_error(
+          phip_convert_legacy(
+            config_yaml = path,
+            backend = "duckdb"
+          )
+        )
 
-    ### arrow
-    expect_no_error(
-      phip_convert_legacy(
-        config_yaml = path,
-        backend = "arrow"
-      )
-    )
+        ### arrow
+        expect_no_error(
+          phip_convert_legacy(
+            config_yaml = path,
+            backend = "arrow"
+          )
+        )
 
-    ### works without extra_cols -----------------------------------------------
-    # ------------------------------------------------------------------#
-    # 1. Build a sandbox directory in tempdir()
-    # ------------------------------------------------------------------#
-    workdir <- withr::local_tempdir()
+        ### works without extra_cols -----------------------------------------------
+        # ------------------------------------------------------------------#
+        # 1. Build a sandbox directory in tempdir()
+        # ------------------------------------------------------------------#
+        workdir <- withr::local_tempdir()
 
-    # helper: copy a file into workdir, keep basename
-    copy_to_workdir <- function(src) {
-      dst <- file.path(workdir, basename(src))
-      file.copy(src, dst, overwrite = TRUE)
-      basename(src) # return relative path
-    }
+        # helper: copy a file into workdir, keep basename
+        copy_to_workdir <- function(src) {
+          dst <- file.path(workdir, basename(src))
+          file.copy(src, dst, overwrite = TRUE)
+          basename(src) # return relative path
+        }
 
-    # ------------------------------------------------------------------#
-    # 2. Locate original example files in your package
-    # ------------------------------------------------------------------#
-    pkg_ext <- function(name) system.file("extdata", name, package = "phiper")
+        # ------------------------------------------------------------------#
+        # 2. Locate original example files in your package
+        # ------------------------------------------------------------------#
+        pkg_ext <- function(name) system.file("extdata", name, package = "phiper")
 
-    yaml_src <- pkg_ext("config.yaml")
-    exist_src <- pkg_ext("exist.csv")
-    samples_src <- pkg_ext("samples_meta.csv")
-    timepoints_src <- NULL
-    comps_src <- pkg_ext("comparisons.csv")
+        yaml_src <- pkg_ext("config.yaml")
+        exist_src <- pkg_ext("exist.csv")
+        samples_src <- pkg_ext("samples_meta.csv")
+        timepoints_src <- NULL
+        comps_src <- pkg_ext("comparisons.csv")
 
-    # ------------------------------------------------------------------#
-    # 3. Copy everything into workdir
-    # ------------------------------------------------------------------#
-    yaml_dst <- file.path(workdir, "config.yaml")
-    exist_rel <- copy_to_workdir(exist_src)
-    samples_rel <- copy_to_workdir(samples_src)
-    comps_rel <- copy_to_workdir(comps_src)
-    file.copy(yaml_src, yaml_dst, overwrite = TRUE)
+        # ------------------------------------------------------------------#
+        # 3. Copy everything into workdir
+        # ------------------------------------------------------------------#
+        yaml_dst <- file.path(workdir, "config.yaml")
+        exist_rel <- copy_to_workdir(exist_src)
+        samples_rel <- copy_to_workdir(samples_src)
+        comps_rel <- copy_to_workdir(comps_src)
+        file.copy(yaml_src, yaml_dst, overwrite = TRUE)
 
-    # ------------------------------------------------------------------#
-    # 4. Edit the YAML: remove extra_cols, fix paths to be local
-    # ------------------------------------------------------------------#
-    cfg <- yaml::read_yaml(yaml_dst)
+        # ------------------------------------------------------------------#
+        # 4. Edit the YAML: remove extra_cols, fix paths to be local
+        # ------------------------------------------------------------------#
+        cfg <- yaml::read_yaml(yaml_dst)
 
-    cfg$extra_cols <- NULL # drop the key
-    cfg$exist_file <- exist_rel # point to local file
-    cfg$samples_file <- samples_rel
-    cfg$timepoints_file <- NULL
-    cfg$comparisons_file <- comps_rel
+        cfg$extra_cols <- NULL # drop the key
+        cfg$exist_file <- exist_rel # point to local file
+        cfg$samples_file <- samples_rel
+        cfg$timepoints_file <- NULL
+        cfg$comparisons_file <- comps_rel
 
-    yaml::write_yaml(cfg, yaml_dst)
+        yaml::write_yaml(cfg, yaml_dst)
 
-    # ------------------------------------------------------------------#
-    # 5. Call the converter
-    # ------------------------------------------------------------------#
-      pd <- phip_convert_legacy(
-        config_yaml = yaml_dst,
-        backend     = "duckdb"
-      )
+        # ------------------------------------------------------------------#
+        # 5. Call the converter
+        # ------------------------------------------------------------------#
+        pd <- phip_convert_legacy(
+          config_yaml = yaml_dst,
+          backend     = "duckdb"
+        )
 
 
-    # ------------------------------------------------------------------#
-    # 6. Expectations
-    # ------------------------------------------------------------------#
-    expect_s3_class(pd, "phip_data")
-    expect_gt(ncol(get_counts(pd)), 3) # additional columns from meta,
+        # ------------------------------------------------------------------#
+        # 6. Expectations
+        # ------------------------------------------------------------------#
+        expect_s3_class(pd, "phip_data")
+        expect_gt(ncol(get_counts(pd)), 3) # additional columns from meta,
 
-    # as there is no extra_cols
-    expect_false(isTRUE(pd$meta$fold_change))
-    expect_false(isTRUE(pd$meta$longitudinal))
-  })
-                           }))
+        # as there is no extra_cols
+        expect_false(isTRUE(pd$meta$fold_change))
+        expect_false(isTRUE(pd$meta$longitudinal))
+      })
+    })
+  )
 })
 
 ## .auto_read

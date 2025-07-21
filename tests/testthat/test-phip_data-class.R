@@ -25,10 +25,12 @@ contrasts_df <- tibble::tibble(
 # constructor + meta flags
 # ---------------------------------------------------------------------------
 test_that("new_phip_data sets meta flags correctly", {
-  withr::with_message_sink(tempfile(),
-                           withr::with_options(list(warn = -1), {
-    pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory")
-  }))
+  withr::with_message_sink(
+    tempfile(),
+    withr::with_options(list(warn = -1), {
+      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory")
+    })
+  )
 
 
   expect_s3_class(pd, "phip_data")
@@ -41,10 +43,12 @@ test_that("new_phip_data sets meta flags correctly", {
 # print method (just make sure it runs and contains certain strings)
 # ---------------------------------------------------------------------------
 test_that("print.phip_data shows backend and previews", {
-  withr::with_message_sink(tempfile(),
-                           withr::with_options(list(warn = -1), {
-    pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory")
-                           }))
+  withr::with_message_sink(
+    tempfile(),
+    withr::with_options(list(warn = -1), {
+      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory")
+    })
+  )
 
 
   out <- capture.output(print(pd))
@@ -57,10 +61,12 @@ test_that("print.phip_data shows backend and previews", {
 # plain accessors and .check_pd guard
 # ---------------------------------------------------------------------------
 test_that("accessors work and .check_pd errors on wrong class", {
-  withr::with_message_sink(tempfile(),
-                           withr::with_options(list(warn = -1), {
-    pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory")
-  }))
+  withr::with_message_sink(
+    tempfile(),
+    withr::with_options(list(warn = -1), {
+      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory")
+    })
+  )
 
   expect_equal(get_counts(pd), counts_tbl)
   expect_equal(get_comparisons(pd), contrasts_df)
@@ -75,10 +81,12 @@ test_that("accessors work and .check_pd errors on wrong class", {
 # dplyr verb wrappers
 # ---------------------------------------------------------------------------
 test_that("dplyr wrappers modify data_long lazily", {
-  withr::with_message_sink(tempfile(),
-                           withr::with_options(list(warn = -1), {
-    pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory")
-  }))
+  withr::with_message_sink(
+    tempfile(),
+    withr::with_options(list(warn = -1), {
+      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory")
+    })
+  )
 
   pd2 <- dplyr::filter(pd, peptide_id == "pep1")
 
@@ -111,13 +119,15 @@ test_that("disconnect.phip_data closes duckdb connection if present", {
   skip_if_not_installed("duckdb")
 
   con <- DBI::dbConnect(duckdb::duckdb(), dbdir = ":memory:")
-  withr::with_message_sink(tempfile(),
-                           withr::with_options(list(warn = -1), {
-    pd <- new_phip_data(counts_tbl, contrasts_df,
-      backend = "duckdb",
-      meta = list(con = con)
-    )
-  }))
+  withr::with_message_sink(
+    tempfile(),
+    withr::with_options(list(warn = -1), {
+      pd <- new_phip_data(counts_tbl, contrasts_df,
+        backend = "duckdb",
+        meta = list(con = con)
+      )
+    })
+  )
 
   expect_true(DBI::dbIsValid(con))
 

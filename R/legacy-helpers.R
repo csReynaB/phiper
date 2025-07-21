@@ -4,7 +4,6 @@
 # ------------------------------------------------------------------------------
 .auto_read <- function(path,
                        ...) {
-
   base <- basename(path)
 
   ext <- strsplit(base, "\\.", fixed = FALSE)[[1]][-1]
@@ -19,34 +18,36 @@
     rlang::check_installed("arrow")
 
     arrow::read_parquet(path,
-                        as_data_frame = TRUE,
-                        ...)
+      as_data_frame = TRUE,
+      ...
+    )
   } else {
-
     ## ------------------------------------------------------------------ ##
     ##                2.  CSV / TSV branch (original)                     ##
     ## ------------------------------------------------------------------ ##
     hdr <- readLines(path, n = 1L, warn = FALSE)
 
     n_comma <- lengths(regmatches(hdr, gregexpr(",", hdr, fixed = TRUE)))
-    n_semi  <- lengths(regmatches(hdr, gregexpr(";", hdr, fixed = TRUE)))
-    sep     <- if (n_semi > n_comma) ";" else ","
+    n_semi <- lengths(regmatches(hdr, gregexpr(";", hdr, fixed = TRUE)))
+    sep <- if (n_semi > n_comma) ";" else ","
 
     if (requireNamespace("data.table", quietly = TRUE)) {
       rlang::check_installed("data.table")
       data.table::fread(path,
-                        sep          = sep,
-                        data.table   = FALSE,
-                        check.names  = FALSE,
-                        showProgress = FALSE,
-                        ...)
+        sep          = sep,
+        data.table   = FALSE,
+        check.names  = FALSE,
+        showProgress = FALSE,
+        ...
+      )
     } else {
       utils::read.csv(path,
-                      header          = TRUE,
-                      sep             = sep,
-                      check.names     = FALSE,
-                      stringsAsFactors = FALSE,
-                      ...)
+        header = TRUE,
+        sep = sep,
+        check.names = FALSE,
+        stringsAsFactors = FALSE,
+        ...
+      )
     }
   }
 }
@@ -68,13 +69,12 @@
 #'   `extra_cols` (possibly augmented).
 #' @keywords internal
 .legacy_prepare_metadata <- function(samples_file,
-                                    comparisons_file = NULL,
-                                    timepoints_file  = NULL,
-                                    extra_cols = character()) {
-
+                                     comparisons_file = NULL,
+                                     timepoints_file = NULL,
+                                     extra_cols = character()) {
   # ---- samples -------------------------------------------------------------
-  samples <- .auto_read(samples_file)        # small table
-  names(samples)[1] <- "sample_id"           # rename first var
+  samples <- .auto_read(samples_file) # small table
+  names(samples)[1] <- "sample_id" # rename first var
 
   # this is my personal discussion with myself, maybe somebody will find this
   # entertaining in the future:
@@ -116,7 +116,7 @@
     # collapse dummies --> ‘group’
     which_max <- max.col(samples[, dummy_cols], ties.method = "first")
     samples$group <- names(samples[, dummy_cols])[which_max]
-    samples       <- samples[, !(names(samples) %in% dummy_cols)]
+    samples <- samples[, !(names(samples) %in% dummy_cols)]
 
     comparisons$variable <- "group"
   }
@@ -142,34 +142,44 @@
     )
 
     # remove the last variable, rename the first and reset the rownames
-    tp_long   <- tp_long[, -ncol(tp_long)]
+    tp_long <- tp_long[, -ncol(tp_long)]
     names(tp_long)[names(tp_long) == "ind_id"] <- "subject_id"
     row.names(tp_long) <- NULL
 
     # filter the NAs out
-    tp_long   <- tp_long[!is.na(tp_long$sample_id), ]
+    tp_long <- tp_long[!is.na(tp_long$sample_id), ]
 
     # ---- reconcile comparisons --------------------------------------------
     if (!is.null(comparisons)) {
       # ---------- 1. reference sets -------------------------------------------
-      valid_vals <- union(tp_long$timepoint,
-                          unique(samples$group %||% character()))
+      valid_vals <- union(
+        tp_long$timepoint,
+        unique(samples$group %||% character())
+      )
 
       # ---------- 2. sanity-check comparisons ---------------------------------
       bad <- setdiff(
         unique(c(comparisons$group1, comparisons$group2)),
         valid_vals
-        )
+      )
 
-      .chk_cond(length(bad) > 0,
-                sprintf("Comparisons refer to unknown group/timepoint: %s",
-                        paste(bad, collapse = ", ")))
+      .chk_cond(
+        length(bad) > 0,
+        sprintf(
+          "Comparisons refer to unknown group/timepoint: %s",
+          paste(bad, collapse = ", ")
+        )
+      )
 
       # if group duplicates timepoint drop it
       if ("group" %in% names(samples) &&
-          identical(samples$group,
-                    tp_long$timepoint[match(samples$sample_id,
-                                            tp_long$sample_id)])) {
+        identical(
+          samples$group,
+          tp_long$timepoint[match(
+            samples$sample_id,
+            tp_long$sample_id
+          )]
+        )) {
         samples$group <- NULL
         comparisons$variable <- "timepoint"
       }
@@ -177,14 +187,16 @@
     # ---------- 3. merge ------------------------------------------------------
     # add the time-point info if present
     samples <- merge(samples,
-                     tp_long,
-                     by = "sample_id"
+      tp_long,
+      by = "sample_id"
     )
 
     timepoints <- tp_long
   }
 
-  list(samples     = samples,
-       comparisons = comparisons,
-       timepoints  = timepoints)
+  list(
+    samples = samples,
+    comparisons = comparisons,
+    timepoints = timepoints
+  )
 }

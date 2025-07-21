@@ -9,22 +9,24 @@
 # ---------------------------------------------------------------------------
 .read_duckdb_backend <- function(cfg,
                                  meta) {
-
   rlang::check_installed(c("duckdb", "DBI", "dbplyr"),
-                         reason = "duckdb backend")
+    reason = "duckdb backend"
+  )
 
-  cache_dir   <- withr::local_tempdir("phiper_cache")   # optional name-prefix
+  cache_dir <- withr::local_tempdir("phiper_cache") # optional name-prefix
   duckdb_file <- file.path(cache_dir, "phip_cache.duckdb")
 
   con <- DBI::dbConnect(duckdb::duckdb(), dbdir = duckdb_file)
 
-  q  <- function(x) DBI::dbQuoteString(con, x)
+  q <- function(x) DBI::dbQuoteString(con, x)
   qi <- function(x) DBI::dbQuoteIdentifier(con, x)
 
   ## file reader based on the file extension (.csv/.parquet)
   ## returns a character string (SQL query)
   duckdb_load_sql <- function(path, table_name, header = TRUE) {
-    if (is.null(path)) return(NULL)          # fallback to NULL
+    if (is.null(path)) {
+      return(NULL)
+    } # fallback to NULL
 
     ext <- paste0(
       tolower(strsplit(basename(path), "\\.", fixed = FALSE)[[1]][-1]),
@@ -33,7 +35,7 @@
 
     is_parquet <- grepl("^parq(uet)?(\\.|$)|^pq(\\.|$)", ext)
     reader_fun <- if (is_parquet) "parquet_scan" else "read_csv_auto"
-    qpath      <- sprintf("'%s'", gsub("'", "''", path))
+    qpath <- sprintf("'%s'", gsub("'", "''", path))
 
     if (reader_fun == "parquet_scan") {
       sprintf(
@@ -52,25 +54,31 @@
   # -----------------------------------------------------------------------
   # 1. OPTIONAL MATRICES ---------------------------------------------------
   load_and_unpivot <- function(file, wide_name, long_name, value_col) {
-    if (is.null(file)) return(NULL)
+    if (is.null(file)) {
+      return(NULL)
+    }
     DBI::dbExecute(con, duckdb_load_sql(file, wide_name))
 
     first_col <- DBI::dbGetQuery(
       con,
-      sprintf("SELECT column_name
+      sprintf(
+        "SELECT column_name
                  FROM duckdb_columns()
                 WHERE table_name = '%s'
              ORDER BY column_index LIMIT 1;",
-              wide_name)
+        wide_name
+      )
     )$column_name
 
     samp_cols <- DBI::dbGetQuery(
       con,
-      sprintf("SELECT column_name
+      sprintf(
+        "SELECT column_name
                  FROM duckdb_columns()
                 WHERE table_name = '%s' AND column_name <> '%s'
              ORDER BY column_index;",
-              wide_name, first_col)
+        wide_name, first_col
+      )
     )$column_name
 
     DBI::dbExecute(
@@ -89,19 +97,29 @@
 
   ## create a list of matrices (or actually names, as the tables are registered
   ## in the temporary duckdb dir)
-  long_tbls <- list(tbl_counts = load_and_unpivot(cfg$exist_file,      "counts_wide",
-                                                  "counts_long",   "present"),
-                    tbl_fc     = load_and_unpivot(cfg$fold_change_file,"fold_change_wide",
-                                                  "fold_change_long","fold_change"),
-                    tbl_inp    = load_and_unpivot(cfg$input_file,      "input_wide",
-                                                  "input_long",    "input_count"),
-                    tbl_hit    = load_and_unpivot(cfg$hit_file,        "hit_wide",
-                                                  "hit_long",      "hit_count"))
+  long_tbls <- list(
+    tbl_counts = load_and_unpivot(
+      cfg$exist_file, "counts_wide",
+      "counts_long", "present"
+    ),
+    tbl_fc = load_and_unpivot(
+      cfg$fold_change_file, "fold_change_wide",
+      "fold_change_long", "fold_change"
+    ),
+    tbl_inp = load_and_unpivot(
+      cfg$input_file, "input_wide",
+      "input_long", "input_count"
+    ),
+    tbl_hit = load_and_unpivot(
+      cfg$hit_file, "hit_wide",
+      "hit_long", "hit_count"
+    )
+  )
 
   ## remove the NULLs
   long_tbls <- Filter(Negate(is.null), long_tbls)
 
-  stopifnot(length(long_tbls) > 0)   # at least one matrix must be present
+  stopifnot(length(long_tbls) > 0) # at least one matrix must be present
 
   base_tbl <- long_tbls[[1]]
 
@@ -115,12 +133,14 @@
   for (tbl in long_tbls[-1]) {
     value_col <- DBI::dbGetQuery(
       con,
-      sprintf("SELECT column_name
+      sprintf(
+        "SELECT column_name
                  FROM duckdb_columns()
                 WHERE table_name = '%s'
                   AND column_name NOT IN ('peptide_id','sample_id')
              LIMIT 1;",
-              tbl)
+        tbl
+      )
     )$column_name
 
     DBI::dbExecute(
@@ -137,7 +157,6 @@
     ## clean after merging --> removing unnecessary large tables, everything is
     ## in final_long now
     DBI::dbExecute(con, sprintf("DROP TABLE %s;", tbl))
-
   }
 
   # -----------------------------------------------------------------------
@@ -198,25 +217,26 @@
 #' @return A `phip_data` object whose `data_long` slot is a tibble in RAM.
 #' @keywords internal
 .read_memory_backend <- function(cfg, meta) {
-
   # ---------- tiny helper ----------------------------------------------------
   ## safe fallback when file_name is NULL
   .read_or_null <- function(path) if (is.null(path)) NULL else .auto_read(path)
 
   ## safe fallback when NULL
   .process_matrix <- function(mat, value_col) {
-    if (is.null(mat)) return(NULL)
+    if (is.null(mat)) {
+      return(NULL)
+    }
 
-    data.table::setDT(mat)                    # in-place, no copy
-    id_col  <- names(mat)[1]
+    data.table::setDT(mat) # in-place, no copy
+    id_col <- names(mat)[1]
     valcols <- names(mat)[-1]
 
     long <- data.table::melt(
       mat,
-      id.vars   = id_col,
+      id.vars = id_col,
       measure.vars = valcols,
       variable.name = "sample_id",
-      value.name    = value_col,
+      value.name = value_col,
       variable.factor = FALSE
     )
 
@@ -226,10 +246,10 @@
 
   # ---------- 1.  read & pivot matrices --------------------------------------
   mats <- list(
-    counts      = .process_matrix(.read_or_null(cfg$exist_file),       "present"),
+    counts      = .process_matrix(.read_or_null(cfg$exist_file), "present"),
     fold_change = .process_matrix(.read_or_null(cfg$fold_change_file), "fold_change"),
-    input       = .process_matrix(.read_or_null(cfg$input_file),       "input_count"),
-    hit         = .process_matrix(.read_or_null(cfg$hit_file),         "hit_count")
+    input       = .process_matrix(.read_or_null(cfg$input_file), "input_count"),
+    hit         = .process_matrix(.read_or_null(cfg$hit_file), "hit_count")
   )
 
   ## filter out NULLs
@@ -238,14 +258,16 @@
   # ---------- 2.  progressively join value columns ---------------------------
   out <- mats[[1L]]
   for (tbl in mats[-1]) {
-    vcol  <- setdiff(names(tbl), c("sample_id", "peptide_id"))
-    out   <- dplyr::left_join(out,
-                              tbl[, c("sample_id", "peptide_id", vcol)],
-                              by = c("sample_id", "peptide_id"))
+    vcol <- setdiff(names(tbl), c("sample_id", "peptide_id"))
+    out <- dplyr::left_join(out,
+      tbl[, c("sample_id", "peptide_id", vcol)],
+      by = c("sample_id", "peptide_id")
+    )
   }
 
   ## clear memory
-  rm(mats); invisible(gc())
+  rm(mats)
+  invisible(gc())
 
   # ---------- 3.  attach sample metadata -------------------------------------
   out <- merge(out, meta$samples, by = "sample_id")
