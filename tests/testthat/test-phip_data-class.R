@@ -70,8 +70,10 @@ test_that("accessors work and .check_pd errors on wrong class", {
   withr::with_message_sink(
     tempfile(),
     withr::with_options(list(warn = -1), {
-      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory",
-                          peptide_library = FALSE, auto_expand = FALSE)
+      pd <- new_phip_data(counts_tbl, contrasts_df,
+        backend = "memory",
+        peptide_library = FALSE, auto_expand = FALSE
+      )
     })
   )
 
@@ -91,8 +93,10 @@ test_that("dplyr wrappers modify data_long lazily", {
   withr::with_message_sink(
     tempfile(),
     withr::with_options(list(warn = -1), {
-      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory",
-                          peptide_library = FALSE, auto_expand = FALSE)
+      pd <- new_phip_data(counts_tbl, contrasts_df,
+        backend = "memory",
+        peptide_library = FALSE, auto_expand = FALSE
+      )
     })
   )
 
