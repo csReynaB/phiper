@@ -35,38 +35,50 @@
 #' @keywords internal
 
 .resolve_paths <- function(
-    exist_file = NULL,
-    fold_change_file = NULL,
-    samples_file = NULL,
-    input_file = NULL,
-    hit_file = NULL,
-    timepoints_file = NULL,
-    extra_cols = NULL,
-    comparisons_file = NULL,
-    output_dir = NULL, # deprecated
-    backend = NULL,
-    peptide_library = TRUE,
-    config_yaml = NULL) {
+    exist_file        = NULL,
+    fold_change_file  = NULL,
+    samples_file      = NULL,
+    input_file        = NULL,
+    hit_file          = NULL,
+    timepoints_file   = NULL,
+    extra_cols        = NULL,
+    comparisons_file  = NULL,
+    output_dir        = NULL, # deprecated
+    data_long_path    = NULL,
+    backend           = NULL,
+    peptide_library   = TRUE,
+    config_yaml       = NULL) {
   ## ------------------------------------------------------------------------ ##
   ## 1.  locate base directory & read yaml (if any provided)                  ##
   ## ------------------------------------------------------------------------ ##
+  # Determine base_dir depending on which input source was provided
   base_dir <- if (!is.null(config_yaml)) {
-    fs::path_dir(fs::path_abs(config_yaml))
-  } else {
-    ## at least samples_file must be given when no YAML ----------------
-    .chk_cond(
-      is.null(samples_file),
-      "When 'config_yaml' is absent you must supply 'samples_file'."
-    )
 
-    fs::path_dir(fs::path_abs(exist_file %||% samples_file))
+    # 1) If a YAML config was given, take its folder
+    fs::path_dir(fs::path_abs(config_yaml))
+
+  } else if (!is.null(data_long_path)) {
+
+    # 2) If a data_long_path directory was given - use it
+    fs::path_dir(fs::path_abs(data_long_path))
+
+  } else {
+
+    # 3) Otherwise require at least a samples_file (or exist_file)
+    .chk_cond(
+      is.null(samples_file) && is.null(exist_file),
+      "When neither 'config_yaml' nor 'data_long_path' is provided,
+      you must supply 'samples_file' or 'exist_file'."
+    )
+    # pick samples_file if present, else exist_file, then take its parent folder
+    fs::path_dir(fs::path_abs(samples_file %||% exist_file))
   }
 
   yaml_cfg <- if (!is.null(config_yaml)) {
     ## validate the file extension
     .chk_path(config_yaml, "config_yaml", c("yml", "yaml"))
 
-    ## read the yaml
+    ## read the yamlW
     rlang::check_installed("yaml")
     yaml::read_yaml(config_yaml)
   } else {
@@ -81,6 +93,7 @@
                     key,
                     validate = NULL,
                     optional = FALSE,
+                    absolutize = FALSE,
                     ...) {
     # safe fallback to NULL --> if both NULL, then %||% returns NULL
     val <- yaml_cfg[[key]] %||% arg # yaml first, then explicit
@@ -91,8 +104,9 @@
       sprintf("Missing required argument '%s' in YAML or call.", key)
     )
 
-    # if the validator if .chk_path, expand the path to absolute
-    if (!is.null(val) && identical(validate, .chk_path)) {
+    # if the validator is .chk_path or absolute == TRUE, expand the path
+    #to absolute
+    if ((!is.null(val) && identical(validate, .chk_path)) || absolutize) {
       if (!fs::is_absolute_path(val)) {
         val <- fs::path_abs(val, start = base_dir)
       }
@@ -110,6 +124,8 @@
   ## ------------------------------------------------------------------------ ##
   ## 3.  resolve every supported argument                                     ##
   ## ------------------------------------------------------------------------ ##
+  samples_required <- !is.null(data_long_path)
+
   cfg <- list(
     exist_file = fetch(exist_file,
       "exist_file",
@@ -138,6 +154,7 @@
     samples_file = fetch(samples_file,
       "samples_file",
       .chk_path,
+      optional = samples_required,
       extension = c("csv", "parquet", "parq", "pq")
     ),
     timepoints_file = fetch(timepoints_file,
@@ -160,6 +177,10 @@
       "output_dir",
       optional = TRUE
     ),
+    data_long_path = fetch(data_long_path,
+                           "data_long_path",
+                           optional = !samples_required,
+                           absolutize = TRUE),
     backend = fetch(
       backend,
       "backend",
@@ -178,20 +199,39 @@
     "Arguments 'input_file' and 'hit_file' must be provided together."
   )
 
-  #  rule 2: at least one matrix source present -------------------------
-  all_null <- with(cfg, is.null(exist_file) &&
-    is.null(fold_change_file) &&
-    is.null(input_file) &&
-    is.null(hit_file))
-  .chk_cond(
-    all_null,
-    paste0(
-      "Supply at least one of:\n",
-      "  * 'exist_file'\n",
-      "  * 'fold_change_file'\n",
-      "  * both 'input_file' and 'hit_file'"
+  # Rule 2a: if data_long_path is provided, it must be the ONLY file argument
+  if (!is.null(cfg$data_long_path)) {
+    others_supplied <- any(
+      !is.null(cfg$exist_file),
+      !is.null(cfg$fold_change_file),
+      !is.null(cfg$input_file),
+      !is.null(cfg$hit_file)
     )
-  )
+    .chk_cond(
+      others_supplied,
+      "When 'data_long_path' is supplied, do not supply 'exist_file',
+      'fold_change_file', 'input_file', or 'hit_file'."
+    )
+
+  } else {
+    # Rule 2b: if data_long_path is NOT provided,
+    #          require at least one of the other file arguments
+    all_null <- with(cfg,
+                     is.null(exist_file) &&
+                       is.null(fold_change_file) &&
+                       is.null(input_file) &&
+                       is.null(hit_file)
+    )
+    .chk_cond(
+      all_null,
+      paste0(
+        "Supply at least one of:\n",
+        "  * 'exist_file'\n",
+        "  * 'fold_change_file'\n",
+        "  * both 'input_file' and 'hit_file'"
+      )
+    )
+  }
 
   #  deprecation notice -------------------------------------------------
   .chk_cond(!is.null(cfg$output_dir),
