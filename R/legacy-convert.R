@@ -89,18 +89,18 @@
 #' @export
 
 phip_convert_legacy <- function(
-    exist_file         = NULL,
-    fold_change_file   = NULL,
-    samples_file       = NULL,
-    input_file         = NULL,
-    hit_file           = NULL,
-    timepoints_file    = NULL,
-    extra_cols         = NULL,
-    comparisons_file   = NULL,
-    output_dir         = NULL, # hard deprecation
-    backend            = NULL,
-    peptide_library    = TRUE,
-    config_yaml        = NULL) {
+    exist_file = NULL,
+    fold_change_file = NULL,
+    samples_file = NULL,
+    input_file = NULL,
+    hit_file = NULL,
+    timepoints_file = NULL,
+    extra_cols = NULL,
+    comparisons_file = NULL,
+    output_dir = NULL, # hard deprecation
+    backend = NULL,
+    peptide_library = TRUE,
+    config_yaml = NULL) {
   #' @importFrom rlang .data
 
   # ------------------------------------------------------------------
@@ -161,11 +161,11 @@ phip_convert_legacy <- function(
 
     # returning the phip_data object
     new_phip_data(
-      data_long   = long,
+      data_long = long,
       comparisons = comps,
       peptide_library = cfg$peptide_library,
-      backend     = "duckdb",
-      meta        = list(con = con)
+      backend = "duckdb",
+      meta = list(con = con)
     )
   } else if (backend == "arrow") {
     ## check dependency
@@ -200,11 +200,11 @@ phip_convert_legacy <- function(
 
     # returning the phip_data object
     new_phip_data(
-      data_long   = long,
+      data_long = long,
       comparisons = comps,
       peptide_library = cfg$peptide_library,
-      backend     = "arrow",
-      meta        = list(parquet_dir = arrow_dir)
+      backend = "arrow",
+      meta = list(parquet_dir = arrow_dir)
     )
   }
 }

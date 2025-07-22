@@ -46,7 +46,6 @@ new_phip_data <- function(data_long,
                           backend = c("memory", "duckdb", "arrow"),
                           peptide_library = TRUE,
                           meta = list()) {
-
   backend <- if (is.null(backend)) {
     "duckdb" # implicit default
   } else {

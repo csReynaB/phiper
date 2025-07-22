@@ -209,7 +209,7 @@ test_that("convert legacy: duckdb and arrow", {
         # ------------------------------------------------------------------#
         pd <- phip_convert_legacy(
           config_yaml = yaml_dst,
-          backend     = "duckdb",
+          backend = "duckdb",
           peptide_library = FALSE
         )
 

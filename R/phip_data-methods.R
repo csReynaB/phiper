@@ -44,7 +44,7 @@ print.phip_data <- function(x, ...) {
   ))
 
   # ---- contrasts ------------------------------------------------------------
-  if(!is.null(x$comparisons)) {
+  if (!is.null(x$comparisons)) {
     cat(cli::col_cyan("contrasts:"), "\n")
     cat(paste0(knitr::kable(x$comparisons, format = "simple"), collapse = "\n"))
     cat("\n\n")
@@ -63,7 +63,7 @@ print.phip_data <- function(x, ...) {
     }
   }
 
-  if(!is.null(lib)) {
+  if (!is.null(lib)) {
     show_cols <- intersect(c("peptide_id", "pos", "len_seq"), colnames(lib))
 
     lib_preview <- tryCatch(
