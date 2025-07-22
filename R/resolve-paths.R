@@ -45,6 +45,7 @@
     comparisons_file = NULL,
     output_dir = NULL, # deprecated
     backend = NULL,
+    peptide_library = TRUE,
     config_yaml = NULL) {
   ## ------------------------------------------------------------------------ ##
   ## 1.  locate base directory & read yaml (if any provided)                  ##
@@ -164,6 +165,7 @@
       "backend",
       chk::chk_string
     ),
+    peptide_library = peptide_library,
     base_dir = base_dir # for downstream helpers
   )
 

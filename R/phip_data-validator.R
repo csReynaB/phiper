@@ -164,20 +164,22 @@ validate_phip_data <- function(x,
   }
 
   ## ---------------------------------------------- 8  PEPTIDE-ID COVERAGE
-  missing_in_lib <- setdiff(
-    tbl |> dplyr::distinct(.data$peptide_id) |> dplyr::pull(),
-    x$peptide_library |> dplyr::distinct(.data$peptide_id) |> dplyr::pull()
-  )
-  missing_in_lib <- missing_in_lib[order(missing_in_lib)]
+  if(!is.null(x$peptide_library)) {
+    missing_in_lib <- setdiff(
+      tbl |> dplyr::distinct(.data$peptide_id) |> dplyr::pull(),
+      x$peptide_library |> dplyr::distinct(.data$peptide_id) |> dplyr::pull()
+    )
+    missing_in_lib <- missing_in_lib[order(missing_in_lib)]
 
-  .chk_cond(
-    length(missing_in_lib) > 0,
-    sprintf(
-      "peptide_id not found in peptide_library (e.g. %s)",
-      missing_in_lib[1]
-    ),
-    error = FALSE # emit warning instead of abort
-  )
+    .chk_cond(
+      length(missing_in_lib) > 0,
+      sprintf(
+        "peptide_id not found in peptide_library (e.g. %s)",
+        missing_in_lib[1]
+      ),
+      error = FALSE # emit warning instead of abort
+    )
+  }
 
   ## ---------------------------------------------- 9  COMPARISONS TABLE
   cmp <- x$comparisons

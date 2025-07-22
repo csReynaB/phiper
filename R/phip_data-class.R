@@ -34,7 +34,7 @@
 #'   data_long = tidy_counts,
 #'   comparisons = NULL,
 #'   backend = "duckdb",
-#'   peptide_library = default_peptides
+#'   peptide_library = TRUE
 #' )
 #' }
 #' ## list available backends
@@ -44,7 +44,7 @@
 new_phip_data <- function(data_long,
                           comparisons,
                           backend = c("memory", "duckdb", "arrow"),
-                          peptide_library = NULL,
+                          peptide_library = TRUE,
                           meta = list()) {
 
   backend <- if (is.null(backend)) {
@@ -71,7 +71,11 @@ new_phip_data <- function(data_long,
   # --------------------------------------------------------------------------
   # Download the peptide metadata library
   # --------------------------------------------------------------------------
-  peptide_library <- peptide_library %||% get_peptide_meta()
+  if (peptide_library) {
+    peptide_library <- get_peptide_meta()
+  } else {
+    peptide_library <- NULL
+  }
 
   # --------------------------------------------------------------------------
   # Scan column names for automatic meta flags

@@ -50,6 +50,8 @@
 #' @param output_dir       *Deprecated.* Ignored with a warning.
 #' @param backend          Storage backend: `"arrow"`, `"duckdb"`, or
 #'   `"memory"`. Defaults to `"duckdb"`.
+#' @param peptide_library logical, defining if the `peptide_library` is to be
+#'    downloaded from the official `phiper` GitHub
 #' @param config_yaml      Optional YAML file containing any of the above
 #'   parameters (see example).
 #'
@@ -87,17 +89,18 @@
 #' @export
 
 phip_convert_legacy <- function(
-    exist_file = NULL,
-    fold_change_file = NULL,
-    samples_file = NULL,
-    input_file = NULL,
-    hit_file = NULL,
-    timepoints_file = NULL,
-    extra_cols = NULL,
-    comparisons_file = NULL,
-    output_dir = NULL, # hard deprecation
-    backend = NULL,
-    config_yaml = NULL) {
+    exist_file         = NULL,
+    fold_change_file   = NULL,
+    samples_file       = NULL,
+    input_file         = NULL,
+    hit_file           = NULL,
+    timepoints_file    = NULL,
+    extra_cols         = NULL,
+    comparisons_file   = NULL,
+    output_dir         = NULL, # hard deprecation
+    backend            = NULL,
+    peptide_library    = TRUE,
+    config_yaml        = NULL) {
   #' @importFrom rlang .data
 
   # ------------------------------------------------------------------
@@ -125,6 +128,7 @@ phip_convert_legacy <- function(
     comparisons_file,
     output_dir,
     backend,
+    peptide_library,
     config_yaml
   )
 
@@ -159,6 +163,7 @@ phip_convert_legacy <- function(
     new_phip_data(
       data_long   = long,
       comparisons = comps,
+      peptide_library = cfg$peptide_library,
       backend     = "duckdb",
       meta        = list(con = con)
     )
@@ -197,6 +202,7 @@ phip_convert_legacy <- function(
     new_phip_data(
       data_long   = long,
       comparisons = comps,
+      peptide_library = cfg$peptide_library,
       backend     = "arrow",
       meta        = list(parquet_dir = arrow_dir)
     )

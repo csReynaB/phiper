@@ -44,9 +44,11 @@ print.phip_data <- function(x, ...) {
   ))
 
   # ---- contrasts ------------------------------------------------------------
-  cat(cli::col_cyan("contrasts:"), "\n")
-  cat(paste0(knitr::kable(x$comparisons, format = "simple"), collapse = "\n"))
-  cat("\n\n")
+  if(!is.null(x$comparisons)) {
+    cat(cli::col_cyan("contrasts:"), "\n")
+    cat(paste0(knitr::kable(x$comparisons, format = "simple"), collapse = "\n"))
+    cat("\n\n")
+  }
 
   # ---- peptide library preview ---------------------------------------------
   cat(cli::col_cyan("peptide library preview (first 5 rows):"), "\n")
@@ -61,35 +63,36 @@ print.phip_data <- function(x, ...) {
     }
   }
 
-  show_cols <- intersect(c("peptide_id", "pos", "len_seq"), colnames(lib))
+  if(!is.null(lib)) {
+    show_cols <- intersect(c("peptide_id", "pos", "len_seq"), colnames(lib))
 
-  lib_preview <- tryCatch(
-    {
-      lib |>
-        utils::head(5) |> # LIMIT 5
-        dplyr::collect() |> # into R
-        dplyr::select(dplyr::all_of(show_cols))
-    },
-    error = function(e) tibble::tibble(.error = "<preview failed>")
-  )
+    lib_preview <- tryCatch(
+      {
+        lib |>
+          utils::head(5) |> # LIMIT 5
+          dplyr::collect() |> # into R
+          dplyr::select(dplyr::all_of(show_cols))
+      },
+      error = function(e) tibble::tibble(.error = "<preview failed>")
+    )
 
-  print(lib_preview)
+    print(lib_preview)
 
-  # summary: extra-column count + overall dim ---------------------------------
-  n_cols <- length(colnames(lib))
-  extra_nc <- n_cols - length(show_cols)
+    # summary: extra-column count + overall dim ---------------------------------
+    n_cols <- length(colnames(lib))
+    extra_nc <- n_cols - length(show_cols)
 
-  n_rows <- tryCatch(
-    lib |> dplyr::summarise(n = dplyr::n()) |> dplyr::pull(.data$n),
-    error = function(e) NA_integer_
-  )
+    n_rows <- tryCatch(
+      lib |> dplyr::summarise(n = dplyr::n()) |> dplyr::pull(.data$n),
+      error = function(e) NA_integer_
+    )
 
-  cat(sprintf("... plus %d more columns\n\n", extra_nc))
-  cat(sprintf(
-    "library size: %s rows x %s columns\n\n",
-    format(n_rows, big.mark = ","), n_cols
-  ))
-
+    cat(sprintf("... plus %d more columns\n\n", extra_nc))
+    cat(sprintf(
+      "library size: %s rows x %s columns\n\n",
+      format(n_rows, big.mark = ","), n_cols
+    ))
+  }
 
   # ---- meta flags -----------------------------------------------------------
   cat(cli::col_cyan("meta flags:"), "\n")

@@ -276,6 +276,7 @@
   new_phip_data(
     data_long   = tibble::as_tibble(out),
     comparisons = if (is.null(meta$comparisons)) NULL else tibble::as_tibble(meta$comparisons),
-    backend     = "memory"
+    backend     = "memory",
+    peptide_library = cfg$peptide_library
   )
 }
