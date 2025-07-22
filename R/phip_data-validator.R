@@ -11,7 +11,7 @@ validate_phip_data <- function(x,
   reserved <- c(
     "subject_id", "sample_id", "timepoint",
     "peptide_id", "present", "fold_change",
-    "counts_control", "counts_hit"
+    "counts_input", "counts_hit"
   )
 
   ## ---------------------------------------------- 1  STRUCTURE
