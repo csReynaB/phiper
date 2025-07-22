@@ -143,7 +143,7 @@ phip_convert_legacy <- function(
   )
 
   # ------------------------------------------------------------------
-  # 3. create the phip_data object with different backends
+  # 4. create the phip_data object with different backends
   # ------------------------------------------------------------------
   if (backend == "memory") {
     .read_memory_backend(cfg, meta_list) ## already registers phip_data object
