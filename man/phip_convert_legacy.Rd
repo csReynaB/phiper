@@ -15,6 +15,7 @@ phip_convert_legacy(
   comparisons_file = NULL,
   output_dir = NULL,
   backend = NULL,
+  peptide_library = TRUE,
   config_yaml = NULL
 )
 }
@@ -42,6 +43,9 @@ mapping). Optional for cross-sectional data.}
 
 \item{backend}{Storage backend: \code{"arrow"}, \code{"duckdb"}, or
 \code{"memory"}. Defaults to \code{"duckdb"}.}
+
+\item{peptide_library}{logical, defining if the \code{peptide_library} is to be
+downloaded from the official \code{phiper} GitHub}
 
 \item{config_yaml}{Optional YAML file containing any of the above
 parameters (see example).}

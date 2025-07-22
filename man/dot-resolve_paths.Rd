@@ -15,6 +15,7 @@
   comparisons_file = NULL,
   output_dir = NULL,
   backend = NULL,
+  peptide_library = TRUE,
   config_yaml = NULL
 )
 }

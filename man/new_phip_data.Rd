@@ -8,7 +8,7 @@ new_phip_data(
   data_long,
   comparisons,
   backend = c("memory", "duckdb", "arrow"),
-  peptide_library = NULL,
+  peptide_library = TRUE,
   meta = list()
 )
 }
@@ -50,7 +50,7 @@ pd <- new_phip_data(
   data_long = tidy_counts,
   comparisons = NULL,
   backend = "duckdb",
-  peptide_library = default_peptides
+  peptide_library = TRUE
 )
 }
 ## list available backends
