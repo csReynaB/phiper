@@ -13,15 +13,17 @@ test_that("convert legacy: memory", {
         ## SMOKE TEST --------------------------------------------------------------
         ### memory
         expect_no_error(
-          phip_convert_legacy(
+          pd <- phip_convert_legacy(
             config_yaml = path,
             backend = "memory"
           )
         )
 
+        expect_output(print(pd))
+
         ### with explicit paths, without config file, .parquet handling
         expect_no_error(
-          phip_convert_legacy(
+          pd <- phip_convert_legacy(
             exist_file = file.path(
               system.file("extdata", package = "phiper"),
               "exist.parquet"
@@ -34,9 +36,12 @@ test_that("convert legacy: memory", {
               system.file("extdata", package = "phiper"),
               "comparisons.csv"
             ),
-            backend = "memory"
+            backend = "memory",
+            peptide_library = FALSE
           )
         )
+
+        expect_output(print(pd))
 
         ### error when no required file present
         expect_error(
@@ -45,7 +50,8 @@ test_that("convert legacy: memory", {
               system.file("extdata", package = "phiper"),
               "exist.csv"
             ),
-            backend = "memory"
+            backend = "memory",
+            peptide_library = FALSE
           ), "samples_file"
         )
 
@@ -72,7 +78,8 @@ test_that("convert legacy: memory", {
               system.file("extdata", package = "phiper"),
               "raw_hit.csv"
             ),
-            backend = "memory"
+            backend = "memory",
+            peptide_library = FALSE
           )
         )
 
@@ -98,7 +105,8 @@ test_that("convert legacy: memory", {
               system.file("extdata", package = "phiper"),
               "raw_hit.csv"
             ),
-            backend = "duckdb"
+            backend = "duckdb",
+            peptide_library = FALSE
           )
         )
       })
@@ -127,7 +135,8 @@ test_that("convert legacy: duckdb and arrow", {
         ### default backend ("duckdb")
         expect_no_error(
           phip_convert_legacy(
-            config_yaml = path
+            config_yaml = path,
+            peptide_library = FALSE
           )
         )
 
@@ -135,7 +144,8 @@ test_that("convert legacy: duckdb and arrow", {
         expect_no_error(
           phip_convert_legacy(
             config_yaml = path,
-            backend = "duckdb"
+            backend = "duckdb",
+            peptide_library = FALSE
           )
         )
 
@@ -143,7 +153,8 @@ test_that("convert legacy: duckdb and arrow", {
         expect_no_error(
           phip_convert_legacy(
             config_yaml = path,
-            backend = "arrow"
+            backend = "arrow",
+            peptide_library = FALSE
           )
         )
 
@@ -198,7 +209,8 @@ test_that("convert legacy: duckdb and arrow", {
         # ------------------------------------------------------------------#
         pd <- phip_convert_legacy(
           config_yaml = yaml_dst,
-          backend     = "duckdb"
+          backend     = "duckdb",
+          peptide_library = FALSE
         )
 
 

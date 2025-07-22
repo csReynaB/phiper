@@ -28,7 +28,8 @@ test_that("new_phip_data sets meta flags correctly", {
   withr::with_message_sink(
     tempfile(),
     withr::with_options(list(warn = -1), {
-      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory")
+      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory",
+                          peptide_library = FALSE)
     })
   )
 
@@ -46,7 +47,8 @@ test_that("print.phip_data shows backend and previews", {
   withr::with_message_sink(
     tempfile(),
     withr::with_options(list(warn = -1), {
-      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory")
+      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory",
+                          peptide_library = FALSE)
     })
   )
 
@@ -64,7 +66,8 @@ test_that("accessors work and .check_pd errors on wrong class", {
   withr::with_message_sink(
     tempfile(),
     withr::with_options(list(warn = -1), {
-      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory")
+      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory",
+                          peptide_library = FALSE)
     })
   )
 
@@ -84,7 +87,8 @@ test_that("dplyr wrappers modify data_long lazily", {
   withr::with_message_sink(
     tempfile(),
     withr::with_options(list(warn = -1), {
-      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory")
+      pd <- new_phip_data(counts_tbl, contrasts_df, backend = "memory",
+                          peptide_library = FALSE)
     })
   )
 
@@ -124,7 +128,8 @@ test_that("disconnect.phip_data closes duckdb connection if present", {
     withr::with_options(list(warn = -1), {
       pd <- new_phip_data(counts_tbl, contrasts_df,
         backend = "duckdb",
-        meta = list(con = con)
+        meta = list(con = con),
+        peptide_library = FALSE
       )
     })
   )
