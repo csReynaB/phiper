@@ -9,6 +9,7 @@ new_phip_data(
   comparisons,
   backend = c("memory", "duckdb", "arrow"),
   peptide_library = TRUE,
+  auto_expand = TRUE,
   meta = list()
 )
 }
