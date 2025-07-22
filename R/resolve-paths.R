@@ -35,35 +35,30 @@
 #' @keywords internal
 
 .resolve_paths <- function(
-    exist_file        = NULL,
-    fold_change_file  = NULL,
-    samples_file      = NULL,
-    input_file        = NULL,
-    hit_file          = NULL,
-    timepoints_file   = NULL,
-    extra_cols        = NULL,
-    comparisons_file  = NULL,
-    output_dir        = NULL, # deprecated
-    data_long_path    = NULL,
-    backend           = NULL,
-    peptide_library   = TRUE,
-    config_yaml       = NULL) {
+    exist_file = NULL,
+    fold_change_file = NULL,
+    samples_file = NULL,
+    input_file = NULL,
+    hit_file = NULL,
+    timepoints_file = NULL,
+    extra_cols = NULL,
+    comparisons_file = NULL,
+    output_dir = NULL, # deprecated
+    data_long_path = NULL,
+    backend = NULL,
+    peptide_library = TRUE,
+    config_yaml = NULL) {
   ## ------------------------------------------------------------------------ ##
   ## 1.  locate base directory & read yaml (if any provided)                  ##
   ## ------------------------------------------------------------------------ ##
   # Determine base_dir depending on which input source was provided
   base_dir <- if (!is.null(config_yaml)) {
-
     # 1) If a YAML config was given, take its folder
     fs::path_dir(fs::path_abs(config_yaml))
-
   } else if (!is.null(data_long_path)) {
-
     # 2) If a data_long_path directory was given - use it
     fs::path_dir(fs::path_abs(data_long_path))
-
   } else {
-
     # 3) Otherwise require at least a samples_file (or exist_file)
     .chk_cond(
       is.null(samples_file) && is.null(exist_file),
@@ -105,7 +100,7 @@
     )
 
     # if the validator is .chk_path or absolute == TRUE, expand the path
-    #to absolute
+    # to absolute
     if ((!is.null(val) && identical(validate, .chk_path)) || absolutize) {
       if (!fs::is_absolute_path(val)) {
         val <- fs::path_abs(val, start = base_dir)
@@ -178,9 +173,10 @@
       optional = TRUE
     ),
     data_long_path = fetch(data_long_path,
-                           "data_long_path",
-                           optional = !samples_required,
-                           absolutize = TRUE),
+      "data_long_path",
+      optional = !samples_required,
+      absolutize = TRUE
+    ),
     backend = fetch(
       backend,
       "backend",
@@ -212,15 +208,15 @@
       "When 'data_long_path' is supplied, do not supply 'exist_file',
       'fold_change_file', 'input_file', or 'hit_file'."
     )
-
   } else {
     # Rule 2b: if data_long_path is NOT provided,
     #          require at least one of the other file arguments
-    all_null <- with(cfg,
-                     is.null(exist_file) &&
-                       is.null(fold_change_file) &&
-                       is.null(input_file) &&
-                       is.null(hit_file)
+    all_null <- with(
+      cfg,
+      is.null(exist_file) &&
+        is.null(fold_change_file) &&
+        is.null(input_file) &&
+        is.null(hit_file)
     )
     .chk_cond(
       all_null,
