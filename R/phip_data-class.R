@@ -45,6 +45,7 @@ new_phip_data <- function(data_long,
                           comparisons,
                           backend = c("memory", "duckdb", "arrow"),
                           peptide_library = TRUE,
+                          auto_expand = TRUE,
                           meta = list()) {
   backend <- if (is.null(backend)) {
     "duckdb" # implicit default
@@ -135,7 +136,8 @@ new_phip_data <- function(data_long,
   # --------------------------------------------------------------------------
   # Validate the objects used to construct the phip_data
   # --------------------------------------------------------------------------
-  validate_phip_data(obj) # will stop on error, warn on non-fatal issues
+  # will stop on error, warn on non-fatal issues
+  obj <- validate_phip_data(obj, auto_expand = auto_expand)
 
   # return clean validated phip_data
   return(obj)

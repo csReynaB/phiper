@@ -242,32 +242,55 @@ validate_phip_data <- function(x,
       dplyr::pull(dims, .data$n_obs), expect
     ))
     if (isTRUE(auto_expand)) {
-      # pull the two unique vectors             (same as before)
-      sample_ids <- tbl |>
-        dplyr::distinct(.data$sample_id) |>
-        dplyr::collect() |>
-        dplyr::pull()
+      # 1. create the full grid remotely (depends on the backend)
+      make_full_grid <- function(tbl) {
+        sample_tbl <- tbl |>
+          dplyr::distinct(sample_id) |>
+          dplyr::mutate(dummy = 1L)
 
-      peptide_ids <- tbl |>
-        dplyr::distinct(.data$peptide_id) |>
-        dplyr::collect() |>
-        dplyr::pull()
+        peptide_tbl <- tbl |>
+          dplyr::distinct(peptide_id) |>
+          dplyr::mutate(dummy = 1L)
 
-      # full Cartesian product, no tidyr needed
-      full_grid <- expand.grid(
-        sample_id = sample_ids,
-        peptide_id = peptide_ids,
-        KEEP.OUT.ATTRS = FALSE, # drop factor-level metadata
-        stringsAsFactors = FALSE # keep character columns as character
+        # CROSS JOIN via dummy -- works on any dplyr/dbplyr version
+        sample_tbl |>
+          dplyr::inner_join(peptide_tbl, by = "dummy") |>
+          dplyr::select(-dummy) # clean-up
+      }
+
+      # 2. isolate the metadata that can be recycled
+      non_recyclable_cols <- c(
+        "present", "fold_change",
+        "counts_control", "counts_hit"
       )
 
-      # (optional) convert to tibble so it behaves like the rest of your dplyr
-      # code
-      full_grid <- dplyr::as_tibble(full_grid)
+      recyclable_cols <- colnames(tbl)[colnames(tbl) %nin% non_recyclable_cols]
+      non_recyclable_cols <- colnames(tbl)[colnames(tbl)
+      %in% non_recyclable_cols]
 
-      tbl <- full_grid |> dplyr::left_join(tbl,
-        by = c("sample_id", "peptide_id")
-      )
+      sample_meta <- tbl |> # original table
+        dplyr::select(dplyr::all_of(recyclable_cols)) |>
+        dplyr::distinct() |> # one row per sample_id
+        dplyr::select(-peptide_id) # get rid of peptides
+
+      # 3. mark the original rows
+      tbl <- tbl |> dplyr::mutate(.row_exists = 1L)
+
+      # 3. join this in two steps
+      tbl <- make_full_grid(tbl) |>
+        dplyr::left_join(sample_meta, by = "sample_id") |>
+        dplyr::left_join(dplyr::select(tbl, sample_id, peptide_id,
+                                       non_recyclable_cols, .row_exists),
+                         by = c("sample_id", "peptide_id")) |>
+        dplyr::mutate(across(
+          dplyr::all_of(non_recyclable_cols),
+          ~ dplyr::if_else(is.na(.row_exists), # introduced row?
+            0, # …→ replace with 0
+            .x
+          ) # …→ keep original (NA or value)
+        )) |>
+        dplyr::select(-.row_exists) # clean-up
+
       x$data_long <- tbl
       x$meta$full_cross <- FALSE
     }
