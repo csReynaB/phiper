@@ -46,14 +46,11 @@ new_phip_data <- function(data_long,
                           backend = c("memory", "duckdb", "arrow"),
                           peptide_library = NULL,
                           meta = list()) {
-  backend <- match.arg(backend)
-
-  backend_choices <- c("arrow", "duckdb", "memory")
 
   backend <- if (is.null(backend)) {
     "duckdb" # implicit default
   } else {
-    match.arg(backend, choices = backend_choices)
+    match.arg(backend, choices = c("arrow", "duckdb", "memory"))
   }
 
   # quick sanity check
