@@ -412,17 +412,6 @@ disconnect <- function(x) {
   invisible(x)
 }
 
-################################################################################
-## validator function for phip_data -------------------------------
-################################################################################
-# helper: verify we got a phip_data object
-.check_pd <- function(obj) {
-  .chk_cond(
-    !inherits(obj, "phip_data"),
-    "`x` must be a <phip_data> object."
-  )
-}
-
 #' Internal validator for <phip_data> objects
 #' @keywords internal
 validate_phip_data <- function(x,
