@@ -14,6 +14,7 @@
   extra_cols = NULL,
   comparisons_file = NULL,
   output_dir = NULL,
+  data_long_path = NULL,
   backend = NULL,
   peptide_library = TRUE,
   config_yaml = NULL
