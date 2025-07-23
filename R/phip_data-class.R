@@ -84,7 +84,7 @@ new_phip_data <- function(data_long,
   cols <- colnames(data_long)
   standard_cols <- c(
     "subject_id", "sample_id", "timepoint", "peptide_id",
-    "present", "fold_change", "counts_control", "counts_hit"
+    "present", "fold_change", "counts_input", "counts_hit"
   )
 
   meta$longitudinal <- all(c("timepoint", "sample_id") %in% cols)

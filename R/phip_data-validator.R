@@ -56,6 +56,7 @@ validate_phip_data <- function(x,
 
   ## --------------------------------------------- 3  RESERVED-NAME COLLISIONS
   overlap <- intersect(x$meta$extra_cols, reserved)
+
   .chk_cond(
     length(overlap) > 0,
     sprintf(
