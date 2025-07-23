@@ -64,7 +64,7 @@ phip_convert <- function(
     sample_id    = sample_id %||% "sample_id",
     peptide_id   = peptide_id %||% "peptide_id",
     subject_id   = subject_id %||% "subject_id",
-    timepoint    = timepoint  %||% "timepoint",
+    timepoint    = timepoint %||% "timepoint",
     present      = present %||% "present",
     fold_change  = fold_change %||% "fold_change",
     counts_input = counts_input %||% "counts_input",
@@ -80,11 +80,10 @@ phip_convert <- function(
     # returning the phip_data object
     new_phip_data(
       data_long = data_long,
-      comparisons =  NULL,
+      comparisons = NULL,
       peptide_library = cfg$peptide_library,
       backend = "memory"
     )
-
   } else if (backend == "duckdb") {
     # using the helper (a lot of code is repeated in duckdb and arrow, so i
     # decided to export it into a separate internale helper to reuse it)

@@ -20,7 +20,7 @@
   info <- file.info(cfg$data_long_path)
 
   # ---------- 1.  read the data files -----------------------------------------
-  if (info$isdir ) {
+  if (info$isdir) {
     # 1) list all files in the directory (parquet, csv)
     files <- list.files(
       path       = cfg$data_long_path,
@@ -34,7 +34,6 @@
       rbind,
       lapply(files, .auto_read)
     )
-
   } else {
     out <- .auto_read(cfg$data_long_path)
   }
