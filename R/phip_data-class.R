@@ -90,7 +90,7 @@ new_phip_data <- function(data_long,
   meta$longitudinal <- all(c("timepoint", "sample_id") %in% cols)
   meta$exist <- "present" %in% cols
   meta$fold_change <- "fold_change" %in% cols
-  meta$raw_counts <- all(c("counts_control", "counts_hit") %in% cols)
+  meta$raw_counts <- all(c("counts_input", "counts_hit") %in% cols)
   meta$extra_cols <- cols[cols %nin% standard_cols]
   meta$peptide_con <- attr(peptide_library, "duckdb_con")
 

@@ -42,12 +42,122 @@
   rm(mats)
   invisible(gc())
 
-  # ---------- 1.  read the data files -----------------------------------------
+  # ---------- 2.  read the data files -----------------------------------------
   out <- .rename_to_standard(out, colmap)
 
-  # ---------- 4.  finish ------------------------------------------------------
+  # ---------- 3.  finish ------------------------------------------------------
   tibble::as_tibble(out)
 }
+
+#' @title Read and register “long” PHIPER data into a DuckDB-backed phip_data
+#'
+#' This internal function ingests one or more data files (Parquet or CSV)
+#' specified by `cfg$data_long_path` into a single DuckDB view named
+#' `data_long`, applying user‐provided column mappings (`colmap`) to
+#' rename each source column to the standard PHIPER names. The resulting
+#' `phip_data` object contains a lazy DuckDB table that can be queried
+#' with dplyr without loading the full dataset into R until explicitly
+#' collected.
+#'
+#' @param cfg Named list, must contain element `data_long_path` pointing
+#'   to either a single file or a directory of files. Supported file
+#'   extensions are `.parquet`, `.parq`, `.pq`, and `.csv`.
+#' @param colmap Named character list mapping **standard** PHIPER column
+#'   names (e.g. `"sample_id"`, `"peptide_id"`, …) to the **actual**
+#'   column names found in the source files.
+#' @param con A live DBI connection to a DuckDB database (e.g.
+#'   `DBI::dbConnect(duckdb::duckdb(), dbdir = ...)`).
+#'
+#' @return A `phip_data` S3/S4 object (depending on your package
+#'   implementation) whose `data_long` slot is a `dplyr::tbl_dbi`
+#'   representing the union of all source files. Calculations against
+#'   `data_long` remain lazy until `collect()` is called.
+#'
+#' @details
+#' - If `cfg$data_long_path` is a **directory**, all matching files
+#'   within it are UNION ALL’ed.
+#' - Parquet files are read via `parquet_scan()`, CSV via
+#'   `read_csv_auto()`.
+#' - Column renaming is performed in SQL with `AS`, so no R‐level
+#'   `rename()` calls are needed.
+#' - A DuckDB **VIEW** called `data_long` is created (dropped if it
+#'   existed previously) for downstream queries.
+#'
+#' @keywords internal
+
+.standard_read_duckdb_backend <- function(cfg, colmap) {
+  rlang::check_installed(c("duckdb", "DBI", "dbplyr"),
+                         reason = "duckdb backend"
+  )
+
+  ## 0. open a DuckDB connection -------------------------------------------
+  cache_dir <- withr::local_tempdir("phiper_cache") # optional name-prefix
+  duckdb_file <- file.path(cache_dir, "phip_cache.duckdb")
+
+  con <- DBI::dbConnect(duckdb::duckdb(), dbdir = duckdb_file)
+
+  ## ── 1. Determine files to load ───────────────────────────────────────
+  info <- file.info(cfg$data_long_path)
+
+  files <- if (isTRUE(info$isdir)) {
+    list.files(cfg$data_long_path,
+               pattern = "\\.(parquet|parq|pq|csv)$", full.names = TRUE)
+  } else {
+    cfg$data_long_path
+  }
+
+  stopifnot(length(files) > 0)
+
+  ## ── 2. Helper: load a single file into a TEMP TABLE ───────────────────
+  load_file <- function(path, tbl_name) {
+    path_q <- gsub("'", "''", path)  # escape single quotes
+    if (grepl("\\.csv$", path, ignore.case = TRUE)) {
+      DBI::dbExecute(
+        con,
+        sprintf(
+          "CREATE TEMP TABLE %s AS
+             SELECT * FROM read_csv_auto('%s', HEADER=TRUE);",
+          tbl_name, path_q))
+    } else {
+      DBI::dbExecute(
+        con,
+        sprintf(
+          "CREATE TEMP TABLE %s AS
+             SELECT * FROM parquet_scan('%s');",
+          tbl_name, path_q))
+    }
+  }
+
+  tbl_names <- sprintf("f_%d", seq_along(files))
+  Map(load_file, files, tbl_names)  # load every file
+
+  ## ── 3. UNION ALL --> raw_combined ───────────────────────────────────────
+  DBI::dbExecute(
+    con,
+    sprintf(
+      "CREATE TEMP TABLE raw_combined AS %s;",
+      paste(sprintf("SELECT * FROM %s", tbl_names),
+            collapse = " UNION ALL ")))
+
+  ## ── 4. Standardise column names inside DuckDB ─────────────────────────
+  std_tbl <- .rename_to_standard(dplyr::tbl(con, "raw_combined"), colmap)
+
+  dplyr::compute(std_tbl,
+                 name       = "data_long",
+                 temporary  = TRUE,
+                 overwrite  = TRUE)  # materialise result
+
+  ## ── 5. Clean up intermediate tables ──────────────────────────────────
+  DBI::dbExecute(con, "DROP TABLE raw_combined;")
+  invisible(lapply(tbl_names,
+                   function(tn)
+                     DBI::dbExecute(con,
+                                    sprintf("DROP TABLE %s;", tn))))
+
+  invisible(con)  # return the open connection
+
+}
+
 
 .rename_to_standard <- function(df, colname_map) {
   # invert: actual names --> standard names

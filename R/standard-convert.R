@@ -87,19 +87,15 @@ phip_convert <- function(
   } else if (backend == "duckdb") {
     # using the helper (a lot of code is repeated in duckdb and arrow, so i
     # decided to export it into a separate internale helper to reuse it)
-    con <- .read_duckdb_backend(cfg, meta_list)
+    con <- .standard_read_duckdb_backend(cfg, colname_map)
 
     ## duckdb-specific code
-    long <- dplyr::tbl(con, "final_long")
-
-    comps <- if (DBI::dbExistsTable(con, "comparisons")) {
-      dplyr::tbl(con, "comparisons") |> dplyr::collect()
-    }
+    long <- dplyr::tbl(con, "data_long")
 
     # returning the phip_data object
     new_phip_data(
       data_long = long,
-      comparisons = comps,
+      comparisons = NULL,
       peptide_library = cfg$peptide_library,
       backend = "duckdb",
       meta = list(con = con)
