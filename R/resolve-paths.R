@@ -103,6 +103,7 @@
     # to absolute
     if ((!is.null(val) && identical(validate, .chk_path)) || absolutize) {
       if (!fs::is_absolute_path(val)) {
+        val <- basename(val)
         val <- fs::path_abs(val, start = base_dir)
       }
     }
