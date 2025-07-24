@@ -49,12 +49,13 @@
 
 #' @title Read and register "long" phiper data into a DuckDB-backed database
 #'
-#' @description This internal function ingests one or more data files (Parquet
-#'   or CSV) specified by `cfg$data_long_path` into a single DuckDB view named
-#'   `data_long`, applying user-provided column mappings (`colmap`) to rename
-#'   each source column to the standard PHIPER names. The resulting `phip_data`
-#'   object contains a lazy DuckDB table that can be queried with dplyr without
-#'   loading the full dataset into R until explicitly collected.
+#' @description This internal function ingests one or more data files (Parquet or CSV)
+#' specified by `cfg$data_long_path` into a single DuckDB view named
+#' `data_long`, applying user-provided column mappings (`colmap`) to
+#' rename each source column to the standard PHIPER names. The resulting
+#' `phip_data` object contains a lazy DuckDB table that can be queried
+#' with dplyr without loading the full dataset into R until explicitly
+#' collected.
 #'
 #' @param cfg Named list, must contain element `data_long_path` pointing
 #'   to either a single file or a directory of files. Supported file
