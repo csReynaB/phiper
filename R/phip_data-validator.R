@@ -94,6 +94,7 @@ validate_phip_data <- function(x,
       dplyr::filter(.data$n > 1) |>
       utils::head(1) |>
       dplyr::collect()
+
     .chk_cond(
       nrow(dup) > 0,
       "Each (subject_id, peptide_id, timepoint) must
@@ -237,9 +238,11 @@ validate_phip_data <- function(x,
     dplyr::collect()
 
   expect <- dplyr::pull(dims, .data$n_pep) * dplyr::pull(dims, .data$n_smp)
+
   if (dplyr::pull(dims, .data$n_obs) != expect) {
     cli::cli_warn(sprintf(
-      "Counts table is not a full peptide x sample grid (%s / %s rows).",
+      "Counts table was not a full peptide x sample
+      grid (expanded %s to %s rows).",
       dplyr::pull(dims, .data$n_obs), expect
     ))
     if (isTRUE(auto_expand)) {
@@ -269,17 +272,65 @@ validate_phip_data <- function(x,
       non_recyclable_cols <- colnames(tbl)[colnames(tbl)
       %in% non_recyclable_cols]
 
+
+      ## ---- 1. Define the key column -------------------------------------------
+      # sample_id is the only identifier that must remain unique in tbl
+      key_cols <- c("sample_id")
+
+      ## ---- 2. Pick every other column as a candidate for metadata -------------
+      # Anything that is NOT part of the key is a potential metadata column
+      candidate_cols <- setdiff(colnames(tbl), key_cols)
+
+      ## ---- 3. Test which candidate columns are constant within each sample ----
+      # For every sample_id, check how many distinct values each column has.
+      # If the count is always 1, that column is "recyclable".
+      const_tbl <- tbl |>
+        dplyr::group_by(sample_id) |>
+        dplyr::summarise(
+          dplyr::across(
+            dplyr::all_of(candidate_cols),
+            ~ dplyr::n_distinct(.x, na.rm = FALSE) == 1,   # TRUE if only one unique value
+            .names = "const_{.col}"
+          ),
+          .groups = "drop"
+        ) |>
+        collect()
+
+      # Recyclable columns  = columns TRUE for all sample_id rows
+      recyclable_cols <- candidate_cols[
+        sapply(
+          candidate_cols,
+          function(col) all(const_tbl[[paste0("const_", col)]])
+        )
+      ]
+
+      ## define the inherently non-recycleable columns as special cases -->
+      ## smart fallback for edge cases
+      non_extra <- c("peptide_id", "present", "fold_change",
+                     "counts_input", "counts_hit")
+
+      recyclable_cols <- setdiff(recyclable_cols,
+                                 non_extra)
+
+      recyclable_cols <- c("sample_id", recyclable_cols)
+
+      ## the only special column that is nor recyclable neither non-recyclable is
+      ## the peptide_id --> it shouldn't be present in any of them
+
+      # Non‑recyclable columns  = everything else
+      non_recyclable_cols <- setdiff(candidate_cols, c(recyclable_cols, "peptide_id"))
+      non_recyclable_cols <- intersect(colnames(tbl), non_recyclable_cols)
+
       sample_meta <- tbl |> # original table
         dplyr::select(dplyr::all_of(recyclable_cols)) |>
-        dplyr::distinct() |> # one row per sample_id
-        dplyr::select(-peptide_id) # get rid of peptides
+        dplyr::distinct() # one row per sample_id
 
       # 3. mark the original rows
       tbl <- tbl |> dplyr::mutate(.row_exists = 1L)
 
       # 3. join this in two steps
       tbl <- make_full_grid(tbl) |>
-        dplyr::left_join(sample_meta, by = "sample_id") |>
+         dplyr::left_join(sample_meta, by = "sample_id") |>
         dplyr::left_join(
           dplyr::select(
             tbl, sample_id, peptide_id,
@@ -296,7 +347,70 @@ validate_phip_data <- function(x,
         )) |>
         dplyr::select(-.row_exists) # clean-up
 
-      x$data_long <- tbl
+
+      # helper -----------------------------------------------------------------
+      if(x$backend == "duckdb" || x$backend == "arrow") {
+
+
+      .register_tbl <- function(tbl,
+                                con,
+                                name = "data_long",
+                                materialise_table,
+                                temporary  = TRUE) {
+
+        if (materialise_table) {
+          # ---- materialise with compute() -------------------------------------
+          # * name        – quoted automatically
+          # * temporary   – TRUE  → CREATE TEMPORARY TABLE  ...
+          #                 FALSE → CREATE TABLE (persist in current schema)
+          #
+          # compute() returns a dplyr::tbl object lazily pointing to the new table
+
+          out <- dplyr::compute(
+            tbl,
+            name       = name,
+            temporary  = temporary,
+            unique_indexes = NULL,   # pass your own if you need them
+            analyze    = TRUE
+          )
+
+        } else {
+          # ---- build / replace a VIEW ------------------------------------------
+          qry_sql <- dbplyr::sql_render(tbl)
+
+          DBI::dbExecute(
+            con,
+            sprintf(
+              "CREATE OR REPLACE %sVIEW %s AS %s;",
+              if (temporary) "TEMPORARY " else "",
+              DBI::dbQuoteIdentifier(con, name),
+              qry_sql
+            )
+          )
+          out <- dplyr::tbl(con, name)
+        }
+
+        out
+      }
+
+      # after you produced `tbl` with the full grid logic
+      x$data_long <- .register_tbl(
+        tbl        = tbl,
+        con        = x$meta$con,                 # open DuckDB connection
+        name       = "data_long",
+        materialise_table = x$meta$materialise_table    # "materialised" or "view"
+      )
+
+      } else {
+        x$data_long <- tbl
+      }
+      x$meta$full_cross <- TRUE
+    } else {
+      cli::cli_warn(sprintf(
+        "Counts table is not a full peptide x sample grid (%s / %s rows). ",
+        dplyr::pull(dims, .data$n_obs), expect
+      ))
+
       x$meta$full_cross <- FALSE
     }
   } else {
