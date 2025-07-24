@@ -249,17 +249,17 @@ validate_phip_data <- function(x,
       # 1. create the full grid remotely (depends on the backend)
       make_full_grid <- function(tbl) {
         sample_tbl <- tbl |>
-          dplyr::distinct(sample_id) |>
+          dplyr::distinct(.data$sample_id) |>
           dplyr::mutate(dummy = 1L)
 
         peptide_tbl <- tbl |>
-          dplyr::distinct(peptide_id) |>
+          dplyr::distinct(.data$peptide_id) |>
           dplyr::mutate(dummy = 1L)
 
         # CROSS JOIN via dummy -- works on any dplyr/dbplyr version
         sample_tbl |>
           dplyr::inner_join(peptide_tbl, by = "dummy") |>
-          dplyr::select(-dummy) # clean-up
+          dplyr::select(-.data$dummy) # clean-up
       }
 
       # 2. isolate the metadata that can be recycled
@@ -285,11 +285,11 @@ validate_phip_data <- function(x,
       # For every sample_id, check how many distinct values each column has.
       # If the count is always 1, that column is "recyclable".
       const_tbl <- tbl |>
-        dplyr::group_by(sample_id) |>
+        dplyr::group_by(.data$sample_id) |>
         dplyr::summarise(
           dplyr::across(
             dplyr::all_of(candidate_cols),
-            ~ dplyr::n_distinct(.x, na.rm = FALSE) == 1,   # TRUE if only one unique value
+            ~ dplyr::n_distinct(.x, na.rm = FALSE) == 1, # TRUE if only one unique value
             .names = "const_{.col}"
           ),
           .groups = "drop"
@@ -306,11 +306,15 @@ validate_phip_data <- function(x,
 
       ## define the inherently non-recycleable columns as special cases -->
       ## smart fallback for edge cases
-      non_extra <- c("peptide_id", "present", "fold_change",
-                     "counts_input", "counts_hit")
+      non_extra <- c(
+        "peptide_id", "present", "fold_change",
+        "counts_input", "counts_hit"
+      )
 
-      recyclable_cols <- setdiff(recyclable_cols,
-                                 non_extra)
+      recyclable_cols <- setdiff(
+        recyclable_cols,
+        non_extra
+      )
 
       recyclable_cols <- c("sample_id", recyclable_cols)
 
@@ -330,77 +334,72 @@ validate_phip_data <- function(x,
 
       # 3. join this in two steps
       tbl <- make_full_grid(tbl) |>
-         dplyr::left_join(sample_meta, by = "sample_id") |>
+        dplyr::left_join(sample_meta, by = "sample_id") |>
         dplyr::left_join(
           dplyr::select(
-            tbl, sample_id, peptide_id,
-            non_recyclable_cols, .row_exists
+            tbl, .data$sample_id, .data$peptide_id,
+            non_recyclable_cols, .data$.row_exists
           ),
           by = c("sample_id", "peptide_id")
         ) |>
-        dplyr::mutate(across(
+        dplyr::mutate(dplyr::across(
           dplyr::all_of(non_recyclable_cols),
-          ~ dplyr::if_else(is.na(.row_exists), # introduced row?
+          ~ dplyr::if_else(is.na(.data$.row_exists), # introduced row?
             0, # …→ replace with 0
             .x
           ) # …→ keep original (NA or value)
         )) |>
-        dplyr::select(-.row_exists) # clean-up
+        dplyr::select(-.data$.row_exists) # clean-up
 
 
       # helper -----------------------------------------------------------------
-      if(x$backend == "duckdb" || x$backend == "arrow") {
+      if (x$backend == "duckdb" || x$backend == "arrow") {
+        .register_tbl <- function(tbl,
+                                  con,
+                                  name = "data_long",
+                                  materialise_table,
+                                  temporary = TRUE) {
+          if (materialise_table) {
+            # ---- materialise with compute() -------------------------------------
+            # * name        – quoted automatically
+            # * temporary   – TRUE  → CREATE TEMPORARY TABLE  ...
+            #                 FALSE → CREATE TABLE (persist in current schema)
+            #
+            # compute() returns a dplyr::tbl object lazily pointing to the new table
 
-
-      .register_tbl <- function(tbl,
-                                con,
-                                name = "data_long",
-                                materialise_table,
-                                temporary  = TRUE) {
-
-        if (materialise_table) {
-          # ---- materialise with compute() -------------------------------------
-          # * name        – quoted automatically
-          # * temporary   – TRUE  → CREATE TEMPORARY TABLE  ...
-          #                 FALSE → CREATE TABLE (persist in current schema)
-          #
-          # compute() returns a dplyr::tbl object lazily pointing to the new table
-
-          out <- dplyr::compute(
-            tbl,
-            name       = name,
-            temporary  = temporary,
-            unique_indexes = NULL,   # pass your own if you need them
-            analyze    = TRUE
-          )
-
-        } else {
-          # ---- build / replace a VIEW ------------------------------------------
-          qry_sql <- dbplyr::sql_render(tbl)
-
-          DBI::dbExecute(
-            con,
-            sprintf(
-              "CREATE OR REPLACE %sVIEW %s AS %s;",
-              if (temporary) "TEMPORARY " else "",
-              DBI::dbQuoteIdentifier(con, name),
-              qry_sql
+            out <- dplyr::compute(
+              tbl,
+              name = name,
+              temporary = temporary,
+              unique_indexes = NULL, # pass your own if you need them
+              analyze = TRUE
             )
-          )
-          out <- dplyr::tbl(con, name)
+          } else {
+            # ---- build / replace a VIEW ------------------------------------------
+            qry_sql <- dbplyr::sql_render(tbl)
+
+            DBI::dbExecute(
+              con,
+              sprintf(
+                "CREATE OR REPLACE %sVIEW %s AS %s;",
+                if (temporary) "TEMPORARY " else "",
+                DBI::dbQuoteIdentifier(con, name),
+                qry_sql
+              )
+            )
+            out <- dplyr::tbl(con, name)
+          }
+
+          out
         }
 
-        out
-      }
-
-      # after you produced `tbl` with the full grid logic
-      x$data_long <- .register_tbl(
-        tbl        = tbl,
-        con        = x$meta$con,                 # open DuckDB connection
-        name       = "data_long",
-        materialise_table = x$meta$materialise_table    # "materialised" or "view"
-      )
-
+        # after you produced `tbl` with the full grid logic
+        x$data_long <- .register_tbl(
+          tbl = tbl,
+          con = x$meta$con, # open DuckDB connection
+          name = "data_long",
+          materialise_table = x$meta$materialise_table # "materialised" or "view"
+        )
       } else {
         x$data_long <- tbl
       }
