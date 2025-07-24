@@ -47,6 +47,9 @@
     data_long_path = NULL,
     backend = NULL,
     peptide_library = TRUE,
+    n_cores = NULL,
+    materialise_table = NULL,
+    auto_expand = NULL,
     config_yaml = NULL) {
   ## ------------------------------------------------------------------------ ##
   ## 1.  locate base directory & read yaml (if any provided)                  ##
@@ -101,7 +104,8 @@
 
     # if the validator is .chk_path or absolute == TRUE, expand the path
     # to absolute
-    if ((!is.null(val) && identical(validate, .chk_path)) || absolutize) {
+    if ((!is.null(val) && identical(validate, .chk_path))
+        || (!is.null(val) && absolutize)) {
       if (!fs::is_absolute_path(val)) {
         val <- basename(val)
         val <- fs::path_abs(val, start = base_dir)
@@ -184,6 +188,9 @@
       chk::chk_string
     ),
     peptide_library = peptide_library,
+    n_cores = n_cores,
+    materialise_table = materialise_table,
+    auto_expand = auto_expand,
     base_dir = base_dir # for downstream helpers
   )
 
