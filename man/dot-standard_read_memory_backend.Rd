@@ -2,8 +2,7 @@
 % Please edit documentation in R/standard-backends.R
 \name{.standard_read_memory_backend}
 \alias{.standard_read_memory_backend}
-\title{Build a \strong{memory-backed} \code{phip_data} object (no DuckDB / Arrow) with
-standard worflow}
+\title{Build a \strong{memory-backed} \code{phip_data} object (no DuckDB / Arrow) with standard worflow}
 \usage{
 .standard_read_memory_backend(cfg, colmap)
 }

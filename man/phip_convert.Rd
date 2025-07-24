@@ -96,9 +96,9 @@ When \code{backend = "memory"} the parameters \code{n_cores} and
 \dontrun{
 # Basic DuckDB import, auto-detecting default column names
 phip_obj <- phip_convert(
-  data_long_path   = "data/phip_long.parquet",
-  backend          = "duckdb",
-  n_cores          = 4,
+  data_long_path = "data/phip_long.parquet",
+  backend = "duckdb",
+  n_cores = 4,
   materialise_table = TRUE
 )
 
