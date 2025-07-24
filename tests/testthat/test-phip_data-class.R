@@ -136,6 +136,7 @@ test_that("disconnect.phip_data closes duckdb connection if present", {
     withr::with_options(list(warn = -1), {
       pd <- new_phip_data(counts_tbl, contrasts_df,
         backend = "duckdb",
+        materialise_table = TRUE,
         meta = list(con = con),
         peptide_library = FALSE
       )
