@@ -54,7 +54,13 @@
 #'    downloaded from the official `phiper` GitHub
 #' @param config_yaml      Optional YAML file containing any of the above
 #'   parameters (see example).
+#' @param n_cores Integer >= 1. Number of CPU threads DuckDB/Arrow may use while
+#'   reading and writing files. Ignored when `backend = "memory"`.
 #'
+#' @param materialise_table Logical (DuckDB & Arrow only).
+#'   If `FALSE` the result is registered as a **view**; if `TRUE` the table is
+#'   fully **materialised** and stored on disk, trading higher load time and
+#'   storage for faster repeated queries.
 #' @return A validated `phip_data` object whose `data_long` slot is backed by a
 #'   tibble (memory), a DuckDB connection, or an Arrow dataset, depending on
 #'   `backend`.
@@ -100,6 +106,8 @@ phip_convert_legacy <- function(
     output_dir = NULL, # hard deprecation
     backend = NULL,
     peptide_library = TRUE,
+    n_cores = 8,
+    materialise_table = TRUE,
     config_yaml = NULL) {
   #' @importFrom rlang .data
 
@@ -118,18 +126,20 @@ phip_convert_legacy <- function(
   # 2. resolving the paths to absolute
   # ------------------------------------------------------------------
   cfg <- .resolve_paths(
-    exist_file,
-    fold_change_file,
-    samples_file,
-    input_file,
-    hit_file,
-    timepoints_file,
-    extra_cols,
-    comparisons_file,
-    output_dir,
-    backend,
-    peptide_library,
-    config_yaml
+    exist_file = exist_file,
+    fold_change_file = fold_change_file,
+    samples_file = samples_file,
+    input_file = input_file,
+    hit_file = hit_file,
+    timepoints_file = timepoints_file,
+    extra_cols = extra_cols,
+    comparisons_file = comparisons_file,
+    output_dir = output_dir,
+    backend = backend,
+    peptide_library = peptide_library,
+    config_yaml = config_yaml,
+    n_cores = n_cores,
+    materialise_table = materialise_table
   )
 
   # ------------------------------------------------------------------
