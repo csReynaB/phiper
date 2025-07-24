@@ -68,9 +68,9 @@
 #' \dontrun{
 #' # Basic DuckDB import, auto-detecting default column names
 #' phip_obj <- phip_convert(
-#'   data_long_path   = "data/phip_long.parquet",
-#'   backend          = "duckdb",
-#'   n_cores          = 4,
+#'   data_long_path = "data/phip_long.parquet",
+#'   backend = "duckdb",
+#'   n_cores = 4,
 #'   materialise_table = TRUE
 #' )
 #'
@@ -118,7 +118,7 @@ phip_convert <- function(
   # ------------------------------------------------------------------
   # 2. arg check for duckdb backends
   # ------------------------------------------------------------------
-  if(backend %in% c("arrow", "duckdb")) {
+  if (backend %in% c("arrow", "duckdb")) {
     chk::chk_numeric(n_cores)
     chk::chk_flag(materialise_table)
   } else {
@@ -217,7 +217,7 @@ phip_convert <- function(
     rlang::check_installed(c("arrow"), reason = "arrow backend")
 
     # same as up - use helper to create the data
-    con <- .read_duckdb_backend(cfg, meta_list)
+    con <- .standard_read_duckdb_backend(cfg, colname_map)
 
     # arrow-specific code, create tempdir to store the data
     arrow_dir <- withr::local_tempdir(
@@ -232,21 +232,18 @@ phip_convert <- function(
     DBI::dbExecute(
       con,
       sprintf(
-        "COPY final_long TO %s (FORMAT 'parquet', PER_THREAD_OUTPUT TRUE);",
+        "COPY raw_combined TO %s (FORMAT 'parquet', PER_THREAD_OUTPUT TRUE);",
         DBI::dbQuoteString(con, arrow_dir)
       )
     )
 
     # open as arrow dataset
     long <- arrow::open_dataset(arrow_dir)
-    comps <- if (DBI::dbExistsTable(con, "comparisons")) {
-      dplyr::tbl(con, "comparisons") |> dplyr::collect()
-    }
 
     # returning the phip_data object
     new_phip_data(
       data_long = long,
-      comparisons = comps,
+      comparisons = NULL,
       peptide_library = cfg$peptide_library,
       backend = "arrow",
       meta = list(parquet_dir = arrow_dir)

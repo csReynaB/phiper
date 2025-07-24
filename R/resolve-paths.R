@@ -104,8 +104,8 @@
 
     # if the validator is .chk_path or absolute == TRUE, expand the path
     # to absolute
-    if ((!is.null(val) && identical(validate, .chk_path))
-        || (!is.null(val) && absolutize)) {
+    if ((!is.null(val) && identical(validate, .chk_path)) ||
+      (!is.null(val) && absolutize)) {
       if (!fs::is_absolute_path(val)) {
         val <- basename(val)
         val <- fs::path_abs(val, start = base_dir)

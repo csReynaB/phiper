@@ -2,14 +2,14 @@
   # colname_map is a named list:
   #   std_name = c("old1", "old2", ...), ...
   # We want: old -> std
-  old_to_new <- setNames(names(colname_map), unlist(colname_map))
+  old_to_new <- stats::setNames(names(colname_map), unlist(colname_map))
 
   dplyr::rename_with(
     tbl,
     function(nm) {
       # vectorised: change only those present in the mapping
-      replace <- old_to_new[nm]            # returns NA where not mapped
-      ifelse(is.na(replace), nm, replace)  # keep originals where no match
+      replace <- old_to_new[nm] # returns NA where not mapped
+      ifelse(is.na(replace), nm, replace) # keep originals where no match
     }
   )
 }
@@ -21,11 +21,11 @@
   stopifnot(DBI::dbIsValid(con))
   stopifnot(is.list(colname_map) && length(colname_map) > 0)
 
-  q  <- function(x) DBI::dbQuoteString(con, x)      # 'string'
-  qi <- function(x) DBI::dbQuoteIdentifier(con, x)  # "identifier"
+  q <- function(x) DBI::dbQuoteString(con, x) # 'string'
+  qi <- function(x) DBI::dbQuoteIdentifier(con, x) # "identifier"
 
   ## --- map old --> new ------------------------------------------------------
-  old_to_new <- setNames(names(colname_map), unlist(colname_map))
+  old_to_new <- stats::setNames(names(colname_map), unlist(colname_map))
 
   ## --- object type --------------------------------------------------------
   meta <- DBI::dbGetQuery(
@@ -38,9 +38,11 @@
       q(tbl)
     )
   )
-  if (nrow(meta) == 0)
+  if (nrow(meta) == 0) {
     stop(sprintf("Object `%s` does not exist in current schema.", tbl),
-         call. = FALSE)
+      call. = FALSE
+    )
+  }
 
   is_view <- identical(toupper(meta$table_type[1]), "VIEW")
 
@@ -91,8 +93,9 @@
     )$sql[1]
   }
 
-  if (is.na(defn) || trimws(defn) == "")
+  if (is.na(defn) || trimws(defn) == "") {
     stop("Cannot fetch view definition.", call. = FALSE)
+  }
 
   ## 3. strip leading 'CREATE ... AS' and trailing ';'
   defn <- sub(
@@ -107,10 +110,11 @@
   sel_list <- vapply(
     existing_cols,
     function(col) {
-      if (col %in% names(old_to_new))
+      if (col %in% names(old_to_new)) {
         sprintf("%s AS %s", qi(col), qi(old_to_new[[col]]))
-      else
+      } else {
         qi(col)
+      }
     },
     FUN.VALUE = character(1)
   )
