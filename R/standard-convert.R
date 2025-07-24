@@ -1,3 +1,94 @@
+#' @title Convert raw PhIP-Seq output into a `phip_data` object
+#'
+#' @description `phip_convert()` ingests a "long" table of PhIPsSeq read counts /
+#' enrichment statistics, optionally expands it to the full
+#' `sample_id x peptide_id` grid, and registers the result in one of three
+#' back-ends (*DuckDB*, *Arrow*, or in-memory tibble).
+#' The function returns a fully initialised **`phip_data`** object that can be
+#' queried with the tidy API used throughout the package.
+#'
+#' @param data_long_path Character scalar. File or directory containing the
+#'   *long-format* PhIP-Seq data. Allowed extensions are **`.csv`** and
+#'   **`.parquet`**. Directories are treated as partitions of a parquet set.
+#' @param sample_id,peptide_id,subject_id,timepoint,present,fold_change,counts_input,counts_hit
+#' Optional character strings. Supply these only if your column names differ
+#' from the defaults (`"sample_id"`, `"peptide_id"`, `"subject_id"`,
+#' `"timepoint"`, `"present"`, `"fold_change"`, `"counts_input"`,
+#' `"counts_hit"`). Each argument should contain the *name* of the column in the
+#' incoming data; `NULL` lets the default stand.
+#'
+#' @param backend One of `"duckdb"` (default), `"arrow"`, or `"memory"`.
+#'   Determines where the converted table is stored:
+#'   - **duckdb** - in-process DuckDB database; fast and SQL-capable.
+#'   - **arrow** - Apache Arrow dataset on disk; good for
+#'     columnar analytics & inter-process sharing.
+#'   - **memory** - ordinary R tibble; simplest but limited by RAM.
+#'
+#' @param n_cores Integer >= 1. Number of CPU threads DuckDB/Arrow may use while
+#'   reading and writing files. Ignored when `backend = "memory"`.
+#'
+#' @param materialise_table Logical (DuckDB & Arrow only).
+#'   If `FALSE` the result is registered as a **view**; if `TRUE` the table is
+#'   fully **materialised** and stored on disk, trading higher load time and
+#'   storage for faster repeated queries.
+#'
+#' @param auto_expand Logical. If `TRUE` and the incoming data are **not** a
+#'   complete Cartesian product of `sample_id x peptide_id`, missing
+#'   combinations are generated:
+#'   * Columns that are constant within each `sample_id` (metadata) are copied
+#'     to the new rows.
+#'   * Non-recyclable measurement columns (`fold_change`, `present`,
+#'     `counts_input`, `counts_hit`, etc.) are initialised to 0.
+#'   The expanded table replaces the original *in place*.
+#'
+#' @param peptide_library Logical. If `TRUE` (default) `phip_convert()` will
+#'   attempt to locate and attach the matching peptide-library metadata for
+#'   downstream annotation. Set to `FALSE` to skip this step.
+#'
+#' @return An S3 object of class **`phip_data`** containing:
+#' \describe{
+#'   \item{`data_long`}{The (possibly expanded) long-format table, stored in the
+#'     selected back-end.}
+#'   \item{`comparisons`}{A tibble of pre-computed group comparisons or
+#'     `NULL` if none were supplied.}
+#'   \item{`peptide_library`}{Loaded peptide-library metadata (if
+#'     `peptide_library = TRUE`).}
+#'   \item{`backend`}{Character vector indicating the storage engine.}
+#'   \item{`meta`}{List with connection handles or temporary paths relevant to
+#'     the chosen backend.}
+#' }
+#'
+#' @details
+#' *Paths are resolved to absolute form* before any work begins, and explicit
+#' checks confirm existence as well as extension validity.
+#' When `backend = "memory"` the parameters `n_cores` and
+#' `materialise_table` are ignored and safely reset to `NULL`.
+#'
+#' @examples
+#' \dontrun{
+#' # Basic DuckDB import, auto-detecting default column names
+#' phip_obj <- phip_convert(
+#'   data_long_path   = "data/phip_long.parquet",
+#'   backend          = "duckdb",
+#'   n_cores          = 4,
+#'   materialise_table = TRUE
+#' )
+#'
+#' # Import a CSV, rename columns, keep everything in memory
+#' phip_mem <- phip_convert(
+#'   data_long_path = "data/phip_long.csv",
+#'   sample_id      = "sample",
+#'   peptide_id     = "pep",
+#'   backend        = "memory"
+#' )
+#' }
+#'
+#' @seealso
+#' * `new_phip_data()` for the object constructor.
+#' * `dplyr::tbl()` to query DuckDB/Arrow tables lazily.
+#'
+#' @export
+
 phip_convert <- function(
     data_long_path,
     sample_id = NULL,
@@ -8,7 +99,10 @@ phip_convert <- function(
     fold_change = NULL,
     counts_input = NULL,
     counts_hit = NULL,
-    backend = NULL,
+    backend = "duckdb",
+    n_cores = 8,
+    materialise_table = TRUE,
+    auto_expand = FALSE,
     peptide_library = TRUE) {
   # ------------------------------------------------------------------
   # 1. db-backend: default to "duckdb" if user supplies nothing
@@ -22,12 +116,24 @@ phip_convert <- function(
   }
 
   # ------------------------------------------------------------------
+  # 2. arg check for duckdb backends
+  # ------------------------------------------------------------------
+  if(backend %in% c("arrow", "duckdb")) {
+    chk::chk_numeric(n_cores)
+    chk::chk_flag(materialise_table)
+  } else {
+    ## safe fallback for the memory backend
+    n_cores <- NULL
+    table_type <- NULL
+  }
+
+  # ------------------------------------------------------------------
   # 2. resolving the data_long_file path to absolute
   # ------------------------------------------------------------------
   ## check if the data_long_path provided
   .chk_cond(
     missing(data_long_path) || !nzchar(data_long_path),
-    "'data_long_path' must be provided and non‑empty,
+    "'data_long_path' must be provided and non-empty,
             no default is set."
   )
 
@@ -51,7 +157,10 @@ phip_convert <- function(
   cfg <- .resolve_paths(
     data_long_path = data_long_path,
     backend = backend,
-    peptide_library = peptide_library
+    peptide_library = peptide_library,
+    n_cores = n_cores,
+    materialise_table = materialise_table,
+    auto_expand = auto_expand
   )
 
   ## filter the NULLs
@@ -82,6 +191,7 @@ phip_convert <- function(
       data_long = data_long,
       comparisons = NULL,
       peptide_library = cfg$peptide_library,
+      auto_expand = cfg$auto_expand,
       backend = "memory"
     )
   } else if (backend == "duckdb") {
@@ -90,7 +200,7 @@ phip_convert <- function(
     con <- .standard_read_duckdb_backend(cfg, colname_map)
 
     ## duckdb-specific code
-    long <- dplyr::tbl(con, "data_long")
+    long <- dplyr::tbl(con, "raw_combined")
 
     # returning the phip_data object
     new_phip_data(
@@ -98,6 +208,8 @@ phip_convert <- function(
       comparisons = NULL,
       peptide_library = cfg$peptide_library,
       backend = "duckdb",
+      auto_expand = cfg$auto_expand,
+      materialise_table = cfg$materialise_table,
       meta = list(con = con)
     )
   } else if (backend == "arrow") {
