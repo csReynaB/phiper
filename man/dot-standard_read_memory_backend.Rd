@@ -23,6 +23,6 @@ Reads up one long data frame directly into R and returns an in-memory
 \code{phip_data}. If the \code{data_long_path} is a directory, it reads all files in
 the directory, assuming they have the same file structure. Heavy validation
 of matrix content is deliberately
-\strong{omitted}—that should be performed by the \code{phip_data} class validator.
+\strong{omitted} - that should be performed by the \code{phip_data} class validator.
 }
 \keyword{internal}

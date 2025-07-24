@@ -2,15 +2,7 @@
 % Please edit documentation in R/standard-backends.R
 \name{.standard_read_duckdb_backend}
 \alias{.standard_read_duckdb_backend}
-\title{Read and register “long” PHIPER data into a DuckDB-backed phip_data
-
-This internal function ingests one or more data files (Parquet or CSV)
-specified by \code{cfg$data_long_path} into a single DuckDB view named
-\code{data_long}, applying user‐provided column mappings (\code{colmap}) to
-rename each source column to the standard PHIPER names. The resulting
-\code{phip_data} object contains a lazy DuckDB table that can be queried
-with dplyr without loading the full dataset into R until explicitly
-collected.}
+\title{Read and register "long" phiper data into a DuckDB-backed database}
 \usage{
 .standard_read_duckdb_backend(cfg, colmap)
 }
@@ -20,11 +12,8 @@ to either a single file or a directory of files. Supported file
 extensions are \code{.parquet}, \code{.parq}, \code{.pq}, and \code{.csv}.}
 
 \item{colmap}{Named character list mapping \strong{standard} PHIPER column
-names (e.g. \code{"sample_id"}, \code{"peptide_id"}, …) to the \strong{actual}
+names (e.g. \code{"sample_id"}, \code{"peptide_id"}, ...) to the \strong{actual}
 column names found in the source files.}
-
-\item{con}{A live DBI connection to a DuckDB database (e.g.
-\code{DBI::dbConnect(duckdb::duckdb(), dbdir = ...)}).}
 }
 \value{
 A \code{phip_data} S3/S4 object (depending on your package
@@ -33,11 +22,9 @@ representing the union of all source files. Calculations against
 \code{data_long} remain lazy until \code{collect()} is called.
 }
 \description{
-Read and register “long” PHIPER data into a DuckDB-backed phip_data
-
 This internal function ingests one or more data files (Parquet or CSV)
 specified by \code{cfg$data_long_path} into a single DuckDB view named
-\code{data_long}, applying user‐provided column mappings (\code{colmap}) to
+\code{data_long}, applying user-provided column mappings (\code{colmap}) to
 rename each source column to the standard PHIPER names. The resulting
 \code{phip_data} object contains a lazy DuckDB table that can be queried
 with dplyr without loading the full dataset into R until explicitly
@@ -46,10 +33,10 @@ collected.
 \details{
 \itemize{
 \item If \code{cfg$data_long_path} is a \strong{directory}, all matching files
-within it are UNION ALL’ed.
+within it are UNION ALL'ed.
 \item Parquet files are read via \code{parquet_scan()}, CSV via
 \code{read_csv_auto()}.
-\item Column renaming is performed in SQL with \code{AS}, so no R‐level
+\item Column renaming is performed in SQL with \code{AS}, so no R-level
 \code{rename()} calls are needed.
 \item A DuckDB \strong{VIEW} called \code{data_long} is created (dropped if it
 existed previously) for downstream queries.

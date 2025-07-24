@@ -49,9 +49,9 @@
   tibble::as_tibble(out)
 }
 
-#' @title Read and register "long" phiper data into a DuckDB-backed phip_data
+#' @title Read and register "long" phiper data into a DuckDB-backed database
 #'
-#' This internal function ingests one or more data files (Parquet or CSV)
+#' @description This internal function ingests one or more data files (Parquet or CSV)
 #' specified by `cfg$data_long_path` into a single DuckDB view named
 #' `data_long`, applying user-provided column mappings (`colmap`) to
 #' rename each source column to the standard PHIPER names. The resulting

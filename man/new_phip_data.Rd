@@ -10,6 +10,7 @@ new_phip_data(
   backend = c("memory", "duckdb", "arrow"),
   peptide_library = TRUE,
   auto_expand = TRUE,
+  materialise_table = TRUE,
   meta = list()
 )
 }
@@ -28,6 +29,22 @@ the implicit default is \code{"duckdb"}.}
 \item{peptide_library}{A data frame with one row per \code{peptide_id}
 and its annotations.  If \code{NULL}, the package’s current default
 library is used.}
+
+\item{auto_expand}{Logical. If \code{TRUE} and the input is \strong{not} already the
+full Cartesian product of \code{sample_id} x \code{peptide_id}, the function fills in
+the missing combinations.
+\itemize{
+\item Columns that are constant within a \code{sample_id} (metadata) are duplicated
+to the newly created rows.
+\item Measurement columns such as \code{fold_change}, \code{present}, raw counts, or any
+other non‑recyclable fields are initialised to 0.
+The expanded table replaces \code{data_long} in place.
+}}
+
+\item{materialise_table}{Logical (DuckDB and Arrow back‑ends only).
+If \code{FALSE} (default) the result is registered as a \strong{view}.
+If \code{TRUE} the result is fully \strong{materialised} and stored as a physical
+table, which speeds up repeated queries at the cost of extra memory/disk.}
 
 \item{meta}{Optional named list of metadata flags to pre-populate the
 \code{meta} slot (rarely needed by users).}

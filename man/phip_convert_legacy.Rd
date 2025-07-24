@@ -16,6 +16,8 @@ phip_convert_legacy(
   output_dir = NULL,
   backend = NULL,
   peptide_library = TRUE,
+  n_cores = 8,
+  materialise_table = TRUE,
   config_yaml = NULL
 )
 }
@@ -46,6 +48,14 @@ mapping). Optional for cross-sectional data.}
 
 \item{peptide_library}{logical, defining if the \code{peptide_library} is to be
 downloaded from the official \code{phiper} GitHub}
+
+\item{n_cores}{Integer >= 1. Number of CPU threads DuckDB/Arrow may use while
+reading and writing files. Ignored when \code{backend = "memory"}.}
+
+\item{materialise_table}{Logical (DuckDB & Arrow only).
+If \code{FALSE} the result is registered as a \strong{view}; if \code{TRUE} the table is
+fully \strong{materialised} and stored on disk, trading higher load time and
+storage for faster repeated queries.}
 
 \item{config_yaml}{Optional YAML file containing any of the above
 parameters (see example).}

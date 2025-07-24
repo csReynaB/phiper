@@ -17,6 +17,9 @@
   data_long_path = NULL,
   backend = NULL,
   peptide_library = TRUE,
+  n_cores = NULL,
+  materialise_table = NULL,
+  auto_expand = NULL,
   config_yaml = NULL
 )
 }
