@@ -24,7 +24,19 @@
 #'   library is used.
 #' @param meta Optional named list of metadata flags to pre-populate the
 #'   \code{meta} slot (rarely needed by users).
-#'
+#' @param auto_expand Logical. If `TRUE` and the input is **not** already the
+#'   full Cartesian product of `sample_id` x `peptide_id`, the function fills in
+#'   the missing combinations.
+#'   * Columns that are constant within a `sample_id` (metadata) are duplicated
+#'     to the newly created rows.
+#'   * Measurement columns such as `fold_change`, `present`, raw counts, or any
+#'     other non‑recyclable fields are initialised to 0.
+#'   The expanded table replaces `data_long` in place.
+#' @param materialise_table Logical (DuckDB and Arrow back‑ends only).
+#'   If `FALSE` (default) the result is registered as a **view**.
+#'   If `TRUE` the result is fully **materialised** and stored as a physical
+#'   table, which speeds up repeated queries at the cost of extra memory/disk.
+
 #' @return An object of class \code{"phip_data"}.
 #'
 #' @examples
@@ -46,6 +58,7 @@ new_phip_data <- function(data_long,
                           backend = c("memory", "duckdb", "arrow"),
                           peptide_library = TRUE,
                           auto_expand = TRUE,
+                          materialise_table = TRUE,
                           meta = list()) {
   backend <- if (is.null(backend)) {
     "duckdb" # implicit default
@@ -93,6 +106,7 @@ new_phip_data <- function(data_long,
   meta$raw_counts <- all(c("counts_input", "counts_hit") %in% cols)
   meta$extra_cols <- cols[cols %nin% standard_cols]
   meta$peptide_con <- attr(peptide_library, "duckdb_con")
+  meta$materialise_table <- materialise_table
 
   # check if the data is a full_cross --> that means all peptide x unique_id
   # combinations are present in the data
