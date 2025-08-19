@@ -34,7 +34,6 @@ URL: https://github.com/Polymerase3/phiper
 BugReports: https://github.com/Polymerase3/phiper/issues
 Suggests: 
     arrow,
-    data.table,
     DBI,
     dbplyr,
     duckdb,
@@ -46,8 +45,12 @@ Config/testthat/edition: 3
 Imports: 
     chk,
     cli,
+    colorspace,
+    data.table,
     dplyr,
     fs,
+    ggh4x,
     knitr,
     rlang,
-    tibble
+    tibble,
+    vegan
