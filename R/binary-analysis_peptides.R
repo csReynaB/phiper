@@ -12,9 +12,9 @@
 phip_calc_prevalence <- function(x,
                                  group_cols,
                                  prevalence_threshold = 0,
-                                 join_meta  = TRUE,
-                                 exist_col  = NULL,
-                                 return     = c("wide","long")) {
+                                 join_meta = TRUE,
+                                 exist_col = NULL,
+                                 return = c("wide", "long")) {
   stopifnot(inherits(x, "phip_data"))
   return <- match.arg(return)
 
@@ -23,9 +23,13 @@ phip_calc_prevalence <- function(x,
 
   # presence column autodetect
   if (is.null(exist_col)) {
-    if ("exist" %in% vars) exist_col <- "exist"
-    else if ("present" %in% vars) exist_col <- "present"
-    else stop("Couldn't find a presence column. Tried 'exist' and 'present'. Available: ", paste(vars, collapse = ", "))
+    if ("exist" %in% vars) {
+      exist_col <- "exist"
+    } else if ("present" %in% vars) {
+      exist_col <- "present"
+    } else {
+      stop("Couldn't find a presence column. Tried 'exist' and 'present'. Available: ", paste(vars, collapse = ", "))
+    }
   } else if (!exist_col %in% vars) {
     stop("exist_col '", exist_col, "' not found. Available: ", paste(vars, collapse = ", "))
   }
@@ -33,16 +37,19 @@ phip_calc_prevalence <- function(x,
 
   if (!all(group_cols %in% vars)) {
     missing <- setdiff(group_cols, vars)
-    stop("These group_cols are not present on x$data_long: ",
-         paste(missing, collapse = ", "), "\nAvailable: ", paste(vars, collapse = ", "))
+    stop(
+      "These group_cols are not present on x$data_long: ",
+      paste(missing, collapse = ", "), "\nAvailable: ", paste(vars, collapse = ", ")
+    )
   }
 
-  pep_meta  <- if (isTRUE(join_meta) && !is.null(x$peptide_tbl)) x$peptide_tbl else NULL
-  meta_cols <- if (!is.null(pep_meta)) intersect(c("peptide_id","Description","class","order","family","genus","species"), names(pep_meta)) else character(0)
+  pep_meta <- if (isTRUE(join_meta) && !is.null(x$peptide_tbl)) x$peptide_tbl else NULL
+  meta_cols <- if (!is.null(pep_meta)) intersect(c("peptide_id", "Description", "class", "order", "family", "genus", "species"), names(pep_meta)) else character(0)
 
   .pivot_wider_safe <- function(tbl, ...) {
     tryCatch(tidyr::pivot_wider(tbl, ...),
-             error = function(e) tidyr::pivot_wider(dplyr::collect(tbl), ...))
+      error = function(e) tidyr::pivot_wider(dplyr::collect(tbl), ...)
+    )
   }
 
   res_list <- lapply(group_cols, function(gcol) {
@@ -119,11 +126,10 @@ phip_test_prevalence <- function(
     prev_list,
     group_cols = names(prev_list),
     prevalence_threshold = NULL,
-    p_adjust    = "BH",
-    epsilon_prop  = 0.5,
+    p_adjust = "BH",
+    epsilon_prop = 0.5,
     epsilon_delta = 1,
-    alternative   = "two.sided"
-) {
+    alternative = "two.sided") {
   stopifnot(inherits(x, "phip_data"))
   dl <- x$data_long
 
@@ -152,8 +158,8 @@ phip_test_prevalence <- function(
       dplyr::collect()
     N_map <- stats::setNames(N_tbl$N, N_tbl$Group)
 
-    cols_wide   <- colnames(prev_wide)
-    count_cols  <- grep("_count$", cols_wide, value = TRUE)
+    cols_wide <- colnames(prev_wide)
+    count_cols <- grep("_count$", cols_wide, value = TRUE)
     levs_present <- intersect(levs, sub("_count$", "", count_cols))
     if (length(levs_present) < 2L) next
 
@@ -161,11 +167,14 @@ phip_test_prevalence <- function(
     pair_res <- list()
 
     for (pair in pairs) {
-      g1 <- pair[1]; g2 <- pair[2]
-      cnt1 <- paste0(g1, "_count"); cnt2 <- paste0(g2, "_count")
+      g1 <- pair[1]
+      g2 <- pair[2]
+      cnt1 <- paste0(g1, "_count")
+      cnt2 <- paste0(g2, "_count")
       if (!all(c(cnt1, cnt2, g1, g2) %in% names(prev_wide))) next
 
-      N1 <- as.integer(N_map[g1]); N2 <- as.integer(N_map[g2])
+      N1 <- as.integer(N_map[g1])
+      N2 <- as.integer(N_map[g2])
       if (is.na(N1) || is.na(N2) || N1 <= 0L || N2 <= 0L) next
 
       # pairwise subset (apply optional pairwise prevalence filter)
@@ -178,42 +187,49 @@ phip_test_prevalence <- function(
       if (!nrow(df_pair)) next
 
       # counts (coalesce NA -> 0)
-      v1 <- df_pair[[cnt1]]; v1[is.na(v1)] <- 0L
-      v2 <- df_pair[[cnt2]]; v2[is.na(v2)] <- 0L
+      v1 <- df_pair[[cnt1]]
+      v1[is.na(v1)] <- 0L
+      v2 <- df_pair[[cnt2]]
+      v2[is.na(v2)] <- 0L
 
       # Fisher per peptide
       pvals <- vapply(seq_len(nrow(df_pair)), function(i) {
-        a <- as.integer(v1[i]); b <- as.integer(v2[i])
-        mat <- matrix(c(a + 1, N1 - a + 1,
-                        b + 1, N2 - b + 1),
-                      nrow = 2, byrow = TRUE)
+        a <- as.integer(v1[i])
+        b <- as.integer(v2[i])
+        mat <- matrix(
+          c(
+            a + 1, N1 - a + 1,
+            b + 1, N2 - b + 1
+          ),
+          nrow = 2, byrow = TRUE
+        )
         suppressWarnings(stats::fisher.test(mat, alternative = alternative)$p.value)
       }, numeric(1))
 
       # Ratios (pseudocounts only when zero)
       v1_prop <- (v1 + ifelse(v1 == 0, epsilon_prop, 0)) / N1
       v2_prop <- (v2 + ifelse(v2 == 0, epsilon_prop, 0)) / N2
-      ratio   <- v1_prop / v2_prop
+      ratio <- v1_prop / v2_prop
       ratio[!is.finite(ratio)] <- NA_real_
 
       v1d <- (v1 + ifelse(v1 == 0, epsilon_delta, 0)) / N1
       v2d <- (v2 + ifelse(v2 == 0, epsilon_delta, 0)) / N2
-      dr  <- ifelse(v1d >= v2d, v1d / v2d - 1, -(v2d / v1d - 1))
+      dr <- ifelse(v1d >= v2d, v1d / v2d - 1, -(v2d / v1d - 1))
       dr[!is.finite(dr)] <- 0
 
-      padj    <- stats::p.adjust(pvals, method = p_adjust)
+      padj <- stats::p.adjust(pvals, method = p_adjust)
       sig_raw <- pvals < 0.05
-      sig_bh  <- padj  < 0.05
+      sig_bh <- padj < 0.05
 
       categories <- dplyr::case_when(
-        sig_bh                    ~ "significant post FDR correction",
-        sig_raw & !sig_bh         ~ "significant prior correction",
-        TRUE                      ~ "not significant"
+        sig_bh ~ "significant post FDR correction",
+        sig_raw & !sig_bh ~ "significant prior correction",
+        TRUE ~ "not significant"
       )
 
       # build output **from df_pair** (not prev_wide)
       keep_meta <- intersect(
-        c("Description","class","order","family","genus","species"),
+        c("Description", "class", "order", "family", "genus", "species"),
         names(df_pair)
       )
       comparison_df <- dplyr::tibble(Peptide = df_pair$peptide_id)
@@ -228,13 +244,13 @@ phip_test_prevalence <- function(
         df_pair[, c(g1, g2, cnt1, cnt2), drop = FALSE]
       ) %>%
         dplyr::mutate(
-          Delta_ratio   = dr,
-          ratio         = ratio,
+          Delta_ratio = dr,
+          ratio = ratio,
           pvals_not_adj = pvals,
-          passed_not_adj= sig_raw,
-          pvals_bh      = padj,
-          passed_bh     = sig_bh,
-          categories    = categories
+          passed_not_adj = sig_raw,
+          pvals_bh = padj,
+          passed_bh = sig_bh,
+          categories = categories
         ) %>%
         dplyr::arrange(
           Delta_ratio,
@@ -245,7 +261,7 @@ phip_test_prevalence <- function(
 
       pair_res[[paste0(g1, "_vs_", g2)]] <- list(
         comparison_df = comparison_df,
-        N      = c(N1 = N1, N2 = N2),
+        N = c(N1 = N1, N2 = N2),
         groups = c(group1 = g1, group2 = g2),
         group_col = gcol
       )
@@ -270,33 +286,33 @@ phip_test_prevalence <- function(
 #' @export
 phip_plot_prevalence_scatter <- function(
     comparison,
-    highlight_cols   = NULL,
+    highlight_cols = NULL,
     highlight_colors = NULL,
-    default_color    = "gray70",
+    default_color = "gray70",
     significant_colors = c(
       "not significant"                 = "dodgerblue",
       "significant prior correction"    = "forestgreen",
       "significant post FDR correction" = "firebrick"
     ),
-    interactive = TRUE
-) {
+    interactive = TRUE) {
   # ---- basic checks ----------------------------------------------------------
   stopifnot(is.list(comparison), !is.null(comparison$comparison_df))
   df <- comparison$comparison_df
   g1 <- unname(comparison$groups[[1]])
   g2 <- unname(comparison$groups[[2]])
-  N  <- unname(comparison$N)
+  N <- unname(comparison$N)
 
   if (!all(c(g1, g2) %in% names(df))) {
     stop("Axis columns '", g1, "' or '", g2, "' not found in comparison_df.")
   }
-  cnt1 <- paste0(g1, "_count"); cnt2 <- paste0(g2, "_count")
+  cnt1 <- paste0(g1, "_count")
+  cnt2 <- paste0(g2, "_count")
   if (!all(c(cnt1, cnt2) %in% names(df))) {
     stop("Count columns '", cnt1, "' or '", cnt2, "' not found in comparison_df.")
   }
 
-  has_desc    <- "Description" %in% names(df)
-  has_species <- "species"     %in% names(df)
+  has_desc <- "Description" %in% names(df)
+  has_species <- "species" %in% names(df)
 
   # Ensure finite plotting values
   df_plot <- df %>%
@@ -319,7 +335,7 @@ phip_plot_prevalence_scatter <- function(
     df_plot <- df_plot %>%
       dplyr::rowwise() %>%
       dplyr::mutate(
-        .trues    = list(highlight_cols[ as.logical(c_across(dplyr::all_of(highlight_cols))) ]),
+        .trues    = list(highlight_cols[as.logical(c_across(dplyr::all_of(highlight_cols)))]),
         highlight = if (length(.trues) == 0) "none" else .trues[[1]]
       ) %>%
       dplyr::ungroup() %>%
@@ -330,9 +346,15 @@ phip_plot_prevalence_scatter <- function(
 
     # legend labels via Wilcoxon tests (BH-adjusted) comparing flagged vs non-flagged log2ratio
     pvals <- vapply(highlight_cols, function(flag) {
-      x <- df_plot %>% dplyr::filter(.data[[flag]] %in% TRUE)  %>% dplyr::pull(.data$log2ratio)
-      y <- df_plot %>% dplyr::filter(!(.data[[flag]] %in% TRUE)) %>% dplyr::pull(.data$log2ratio)
-      if (length(x) == 0 || length(y) == 0) return(NA_real_)
+      x <- df_plot %>%
+        dplyr::filter(.data[[flag]] %in% TRUE) %>%
+        dplyr::pull(.data$log2ratio)
+      y <- df_plot %>%
+        dplyr::filter(!(.data[[flag]] %in% TRUE)) %>%
+        dplyr::pull(.data$log2ratio)
+      if (length(x) == 0 || length(y) == 0) {
+        return(NA_real_)
+      }
       stats::wilcox.test(x, y)$p.value
     }, numeric(1))
     pvals_adj <- stats::p.adjust(pvals, method = "BH")
@@ -353,18 +375,18 @@ phip_plot_prevalence_scatter <- function(
           .data$highlight == "none",
           NA_character_,
           paste0(
-            "Peptide: ",  .data$Peptide,                              "<br>",
-            if (has_desc)    paste0("Desc: ",     .data$Description, "<br>") else "",
-            if (has_species) paste0("Species: ",  .data$species,     "<br>") else "",
+            "Peptide: ", .data$Peptide, "<br>",
+            if (has_desc) paste0("Desc: ", .data$Description, "<br>") else "",
+            if (has_species) paste0("Species: ", .data$species, "<br>") else "",
             g1, ": ", .data[[g1]], " / ",
-            g2, ": ", .data[[g2]],                                    "<br>",
+            g2, ": ", .data[[g2]], "<br>",
             "Highlight: ", as.character(.data$highlight)
           )
         )
       ) %>%
-      dplyr::arrange(.data$highlight)  # draw greys first
+      dplyr::arrange(.data$highlight) # draw greys first
 
-    color_aes   <- ggplot2::aes(color = .data$highlight, text = .data$tooltip_txt)
+    color_aes <- ggplot2::aes(color = .data$highlight, text = .data$tooltip_txt)
     color_scale <- ggplot2::scale_color_manual(
       name   = NULL,
       values = manual_vals,
@@ -391,17 +413,19 @@ phip_plot_prevalence_scatter <- function(
           .data$categories == "not significant",
           NA_character_,
           paste0(
-            "Peptide: ",  .data$Peptide,                              "<br>",
-            if (has_desc)    paste0("Desc: ",     .data$Description, "<br>") else "",
-            if (has_species) paste0("Species: ",  .data$species,     "<br>") else "",
+            "Peptide: ", .data$Peptide, "<br>",
+            if (has_desc) paste0("Desc: ", .data$Description, "<br>") else "",
+            if (has_species) paste0("Species: ", .data$species, "<br>") else "",
             g1, ": ", .data[[g1]], " / ",
             g2, ": ", .data[[g2]]
           )
         )
       )
-    color_aes   <- ggplot2::aes(color = .data$categories, text = .data$tooltip_txt)
-    color_scale <- ggplot2::scale_color_manual(values = significant_colors, name = NULL,
-                                               labels = c("ns", "significant", "significant FDR"))
+    color_aes <- ggplot2::aes(color = .data$categories, text = .data$tooltip_txt)
+    color_scale <- ggplot2::scale_color_manual(
+      values = significant_colors, name = NULL,
+      labels = c("ns", "significant", "significant FDR")
+    )
     show_legend <- FALSE
     legend_theme <- ggplot2::theme(legend.position = "none")
   }
@@ -452,17 +476,15 @@ phip_plot_prevalence_scatter <- function(
       legend = list(
         x = 0, xanchor = "left",
         y = 1, yanchor = "top",
-        font = list(size =  nine <- 9) # tiny helper to avoid magic numbers
+        font = list(size = nine <- 9) # tiny helper to avoid magic numbers
       ),
-      margin     = list(l = 80, r = 80, b = 80, t = 80, pad = 0),
+      margin = list(l = 80, r = 80, b = 80, t = 80, pad = 0),
       hoverlabel = list(font = list(size = 10)),
-      xaxis      = list(scaleratio = 1, scaleanchor = "y"),
-      yaxis      = list(scaleratio = 1, scaleanchor = "x")
+      xaxis = list(scaleratio = 1, scaleanchor = "y"),
+      yaxis = list(scaleratio = 1, scaleanchor = "x")
     )
     return(pl)
   }
 
   p
 }
-
-

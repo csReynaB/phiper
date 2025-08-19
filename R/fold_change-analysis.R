@@ -3,18 +3,18 @@
 
 #' PHIP default colour palette ------------------------------------------------
 phip_palette <- c(
-  "#1f78b4",  # dark blue
-  "#fb9a99",  # light salmon
-  "#33a02c",  # medium green
-  "#fdbf6f",  # soft orange
-  "#6a3d9a",  # purple
-  "#b2df8a",  # pale green
-  "#e31a1c",  # red
-  "#a6cee3",  # pale blue
-  "#ff7f00",  # vivid orange
-  "#cab2d6",  # lavender
-  "#b15928",  # brown
-  "#ffff99"   # light yellow
+  "#1f78b4", # dark blue
+  "#fb9a99", # light salmon
+  "#33a02c", # medium green
+  "#fdbf6f", # soft orange
+  "#6a3d9a", # purple
+  "#b2df8a", # pale green
+  "#e31a1c", # red
+  "#a6cee3", # pale blue
+  "#ff7f00", # vivid orange
+  "#cab2d6", # lavender
+  "#b15928", # brown
+  "#ffff99" # light yellow
 )
 
 #' Discrete colour & fill scales using the PHIP palette
@@ -47,7 +47,6 @@ scale_fill_phip <- function(...) {
 #' ggplot2::ggplot(iris, ggplot2::aes(Sepal.Length, Sepal.Width)) +
 #'   ggplot2::geom_point() +
 #'   theme_phip()
-
 theme_phip <- function(base_size = 12, base_family = "") {
   ggplot2::theme_classic(base_size = base_size, base_family = base_family) %+replace%
     ggplot2::theme(
@@ -81,7 +80,7 @@ theme_phip <- function(base_size = 12, base_family = "") {
 #' @return A `ggplot` object ready for further layers / faceting.
 #' @examples
 #' fold_qq_plot(pd, by = c("big_group", "timepoint"), prop = 0.1) +
-#'   facet_wrap(~ big_group, nrow = 2) +
+#'   facet_wrap(~big_group, nrow = 2) +
 #'   ggpubr::theme_pubr()
 #' @export
 fold_qq_plot <- function(pd,
@@ -90,29 +89,39 @@ fold_qq_plot <- function(pd,
                          distribution = stats::qnorm,
                          dparams = list(),
                          xlim = NULL) {
-  #––– sanity checks ---------------------------------------------------------
-  .chk_cond(!inherits(pd, "phip_data"),
-            "`pd` has to be an object of class `phip_data`!")
+  # ––– sanity checks ---------------------------------------------------------
+  .chk_cond(
+    !inherits(pd, "phip_data"),
+    "`pd` has to be an object of class `phip_data`!"
+  )
 
   df <- pd$data_long
   vars <- dplyr::tbl_vars(df)
 
-  .chk_cond(!"fold_change" %in% vars,
-            "Column 'fold_change' not found in pd$data_long.")
+  .chk_cond(
+    !"fold_change" %in% vars,
+    "Column 'fold_change' not found in pd$data_long."
+  )
 
-  .chk_cond(!is.null(by) && !all(by %in% vars),
-            sprintf("Grouping column(s) not found: %s",
-                    paste(setdiff(by, vars), collapse = ", ")))
+  .chk_cond(
+    !is.null(by) && !all(by %in% vars),
+    sprintf(
+      "Grouping column(s) not found: %s",
+      paste(setdiff(by, vars), collapse = ", ")
+    )
+  )
 
-  .chk_cond(!is.numeric(prop) || prop <= 0 || prop > 1,
-            "`prop` must be a number in (0, 1].")
+  .chk_cond(
+    !is.numeric(prop) || prop <= 0 || prop > 1,
+    "`prop` must be a number in (0, 1]."
+  )
 
-  #––– grouping --------------------------------------------------------------
+  # ––– grouping --------------------------------------------------------------
   if (!is.null(by) && length(by)) {
     df <- dplyr::group_by(df, dplyr::across(dplyr::all_of(by)))
   }
 
-  #––– optional down‑sampling ------------------------------------------------
+  # ––– optional down‑sampling ------------------------------------------------
   if (prop < 1) {
     is_remote <- inherits(df, "tbl_sql") || inherits(df, "tbl_arrow")
 
@@ -135,24 +144,26 @@ fold_qq_plot <- function(pd,
 
   df <- dplyr::ungroup(df)
 
-  #––– build aes mapping -----------------------------------------------------
+  # ––– build aes mapping -----------------------------------------------------
   aes_list <- list(sample = rlang::expr(fold_change))
   if (!is.null(by) && length(by)) {
     aes_list$colour <- rlang::sym(by[[1]])
-    aes_list$fill   <- rlang::sym(by[[1]])
+    aes_list$fill <- rlang::sym(by[[1]])
   }
 
   #--- calculate meaningful breaks -------------------------------------------
 
-  #––– plot ------------------------------------------------------------------
+  # ––– plot ------------------------------------------------------------------
   p <- ggplot2::ggplot(df, ggplot2::aes(!!!aes_list)) +
     ggplot2::stat_qq(distribution = distribution, dparams = dparams) +
-    ggplot2::stat_qq_line(distribution = distribution, dparams = dparams,
-                          size = 1.3) +
+    ggplot2::stat_qq_line(
+      distribution = distribution, dparams = dparams,
+      size = 1.3
+    ) +
     ggplot2::xlab("Theoretical Quantiles") +
     ggplot2::ylab("Sample fold_change") +
     ggplot2::scale_y_continuous(
-      breaks = function(lims) pretty(lims, n = 10),      # 10-ish “round” breaks
+      breaks = function(lims) pretty(lims, n = 10), # 10-ish “round” breaks
       labels = function(x) format(x, scientific = FALSE) # plain numbers
     ) +
     theme_phip()
@@ -200,21 +211,28 @@ fold_qq_plot <- function(pd,
 #' @export
 #' @importFrom MASS boxcox
 transform_fold_boxcox <- function(pd, by = NULL, confirm = interactive()) {
+  .chk_cond(
+    !inherits(pd, "phip_data"),
+    "`pd` has to be an object of class `phip_data`!"
+  )
 
-  .chk_cond(!inherits(pd, "phip_data"),
-            "`pd` has to be an object of class `phip_data`!")
-
-  df   <- pd$data_long
+  df <- pd$data_long
   vars <- dplyr::tbl_vars(df)
 
-  .chk_cond(!"fold_change" %in% vars,
-            "Column 'fold_change' not found in pd$data_long.")
+  .chk_cond(
+    !"fold_change" %in% vars,
+    "Column 'fold_change' not found in pd$data_long."
+  )
 
-  .chk_cond(!is.null(by) && !all(by %in% vars),
-            sprintf("Grouping column(s) not found: %s",
-                    paste(setdiff(by, vars), collapse = ", ")))
+  .chk_cond(
+    !is.null(by) && !all(by %in% vars),
+    sprintf(
+      "Grouping column(s) not found: %s",
+      paste(setdiff(by, vars), collapse = ", ")
+    )
+  )
 
-  #––– user confirmation -----------------------------------------------------
+  # ––– user confirmation -----------------------------------------------------
   if (confirm && interactive()) {
     warn <- if (requireNamespace("cli", quietly = TRUE)) cli::cli_alert_warning else warning
     warn("`fold_change` will be **overwritten in place** by its Box‑Cox transform.")
@@ -226,7 +244,7 @@ transform_fold_boxcox <- function(pd, by = NULL, confirm = interactive()) {
 
   grp_cols <- by %||% character(0)
 
-  #––– estimate lambdas locally ---------------------------------------------
+  # ––– estimate lambdas locally ---------------------------------------------
   rlang::check_installed("MASS")
 
   lambda_tbl <- df %>%
@@ -243,14 +261,14 @@ transform_fold_boxcox <- function(pd, by = NULL, confirm = interactive()) {
       .groups = "drop"
     )
 
-  #––– apply transformation --------------------------------------------------
+  # ––– apply transformation --------------------------------------------------
   df2 <- df %>%
     dplyr::left_join(lambda_tbl, by = grp_cols, copy = TRUE) %>%
     dplyr::mutate(
       fold_change = dplyr::if_else(
         lambda == 0,
         log(fold_change),
-        (fold_change ^ lambda - 1) / lambda
+        (fold_change^lambda - 1) / lambda
       )
     ) %>%
     dplyr::select(-lambda)
@@ -273,26 +291,34 @@ transform_fold_boxcox <- function(pd, by = NULL, confirm = interactive()) {
 #' @export
 #' @examples
 #' fold_hist_plot(pd, by = "big_group", prop = 0.1, bins = 100) +
-#'   facet_wrap(~ big_group, nrow = 2)
+#'   facet_wrap(~big_group, nrow = 2)
 fold_hist_plot <- function(pd,
-                           by   = NULL,
+                           by = NULL,
                            prop = 1,
                            bins = 50,
                            xlim = NULL) {
   stopifnot(inherits(pd, "phip_data"))
 
-  df   <- pd$data_long
+  df <- pd$data_long
   vars <- dplyr::tbl_vars(df)
 
-  .chk_cond(!"fold_change" %in% vars,
-            "Column 'fold_change' not found in pd$data_long.")
+  .chk_cond(
+    !"fold_change" %in% vars,
+    "Column 'fold_change' not found in pd$data_long."
+  )
 
-  .chk_cond(!is.null(by) && !all(by %in% vars),
-            sprintf("Grouping column(s) not found: %s",
-                    paste(setdiff(by, vars), collapse = ", ")))
+  .chk_cond(
+    !is.null(by) && !all(by %in% vars),
+    sprintf(
+      "Grouping column(s) not found: %s",
+      paste(setdiff(by, vars), collapse = ", ")
+    )
+  )
 
-  .chk_cond(!is.numeric(prop) || prop <= 0 || prop > 1,
-            "`prop` must be a number in (0, 1].")
+  .chk_cond(
+    !is.numeric(prop) || prop <= 0 || prop > 1,
+    "`prop` must be a number in (0, 1]."
+  )
 
   # group remote sampling similar to fold_qq_plot ---------------------------------
   if (!is.null(by) && length(by)) {
@@ -319,19 +345,21 @@ fold_hist_plot <- function(pd,
 
   aes_list <- list(x = rlang::expr(fold_change))
   if (!is.null(by) && length(by)) {
-    aes_list$fill   <- rlang::sym(by[[1]])
+    aes_list$fill <- rlang::sym(by[[1]])
     aes_list$colour <- rlang::sym(by[[1]])
   }
 
   p <- ggplot2::ggplot(df, ggplot2::aes(!!!aes_list)) +
-    ggplot2::geom_histogram(bins = bins,
-                            alpha = 0.4,
-                            colour = "black",
-                            position = "identity") +
-    #ggplot2::xlab("Theoretical Quantiles") +
-    #ggplot2::ylab("Sample fold_change") +
+    ggplot2::geom_histogram(
+      bins = bins,
+      alpha = 0.4,
+      colour = "black",
+      position = "identity"
+    ) +
+    # ggplot2::xlab("Theoretical Quantiles") +
+    # ggplot2::ylab("Sample fold_change") +
     ggplot2::scale_x_continuous(
-      breaks = function(lims) pretty(lims, n = 7),      # 10-ish “round” breaks
+      breaks = function(lims) pretty(lims, n = 7), # 10-ish “round” breaks
       labels = function(x) format(x, scientific = FALSE) # plain numbers
     ) +
     theme_phip()

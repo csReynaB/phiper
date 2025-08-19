@@ -10,27 +10,27 @@ compute_beta_diversity <- function(x, ...) UseMethod("compute_beta_diversity")
 #' @export
 compute_beta_diversity.phip_data <- function(x,
                                              group_col,
-                                             ranks         = "peptide",
-                                             present_by    = c("exist","fold_change"),
-                                             fc_threshold  = 0,
-                                             norm_method   = c("auto","relative","hellinger","log","none"),
-                                             method        = "bray",
-                                             permutations  = 999,
-                                             sample_meta   = NULL,
-                                             filter_rank   = NULL,
+                                             ranks = "peptide",
+                                             present_by = c("exist", "fold_change"),
+                                             fc_threshold = 0,
+                                             norm_method = c("auto", "relative", "hellinger", "log", "none"),
+                                             method = "bray",
+                                             permutations = 999,
+                                             sample_meta = NULL,
+                                             filter_rank = NULL,
                                              # categorical longitudinal
-                                             time_col      = NULL,
+                                             time_col = NULL,
                                              # carry extra columns from data_long into the output (joined by sample_id)
-                                             carry_cols    = NULL,
+                                             carry_cols = NULL,
                                              # speed
-                                             engine_dist   = c("auto","vegan","parallelDist"),
-                                             n_threads     = max(1L, (if (rlang::is_installed("parallel")) parallel::detectCores() else 1L) - 1L)) {
+                                             engine_dist = c("auto", "vegan", "parallelDist"),
+                                             n_threads = max(1L, (if (rlang::is_installed("parallel")) parallel::detectCores() else 1L) - 1L)) {
   stopifnot(inherits(x, "phip_data"))
-  present_by   <- match.arg(present_by)
-  norm_method  <- match.arg(norm_method)
-  engine_dist  <- match.arg(engine_dist)
+  present_by <- match.arg(present_by)
+  norm_method <- match.arg(norm_method)
+  engine_dist <- match.arg(engine_dist)
 
-  .d  <- rlang::.data
+  .d <- rlang::.data
   sid <- rlang::sym("sample_id")
   pid <- rlang::sym("peptide_id")
   grp <- rlang::sym(group_col)
@@ -64,8 +64,10 @@ compute_beta_diversity.phip_data <- function(x,
     } else {
       # Local data frame: warn if not factor/character and treat as categorical
       if (!(is.factor(tbl[[time_col]]) || is.character(tbl[[time_col]]))) {
-        warning("Continuous time is disabled. Treating `", time_col,
-                "` as categorical (coercing to character for analysis).")
+        warning(
+          "Continuous time is disabled. Treating `", time_col,
+          "` as categorical (coercing to character for analysis)."
+        )
       }
       tlev <- as.character(sort(unique(tbl[[time_col]])))
     }
@@ -85,21 +87,27 @@ compute_beta_diversity.phip_data <- function(x,
   # ----- normalization helper -----
   .normalize <- function(m, how) {
     if (how == "auto") how <- "relative"
-    if (how == "none") return(m)
-    rs <- rowSums(m, na.rm = TRUE); rs[rs == 0] <- 1
+    if (how == "none") {
+      return(m)
+    }
+    rs <- rowSums(m, na.rm = TRUE)
+    rs[rs == 0] <- 1
     rel <- m / rs
     switch(how,
-           relative  = rel,
-           hellinger = sqrt(rel),
-           log       = log1p(m),
-           rel)
+      relative  = rel,
+      hellinger = sqrt(rel),
+      log       = log1p(m),
+      rel
+    )
   }
 
   # ----- distance engine (parallelDist -> vegan fallback) -----
   .dist_fast <- function(m, method, engine, n_threads) {
-    if (engine %in% c("auto","parallelDist") && rlang::is_installed("parallelDist")) {
+    if (engine %in% c("auto", "parallelDist") && rlang::is_installed("parallelDist")) {
       out <- try(parallelDist::parDist(m, method = "bray", threads = n_threads), silent = TRUE)
-      if (!inherits(out, "try-error")) return(out)
+      if (!inherits(out, "try-error")) {
+        return(out)
+      }
     }
     vegan::vegdist(m, method = method)
   }
@@ -110,7 +118,7 @@ compute_beta_diversity.phip_data <- function(x,
     cat("# 1) lazy -> collect agg")
     t0 <- proc.time()
     rk <- tolower(rank)
-    if (rk %in% c("peptide","peptide_id","peptideid")) {
+    if (rk %in% c("peptide", "peptide_id", "peptideid")) {
       ranked <- tbl %>%
         dplyr::transmute(!!sid, !!grp, rank_val = !!pid, value = !!value_expr)
       nm <- if (norm_method == "auto" && present_by == "exist") "none" else norm_method
@@ -134,11 +142,14 @@ compute_beta_diversity.phip_data <- function(x,
     # Filter rank (vector or function) while still lazy where possible
     if (is.function(filter_rank)) {
       # get allowed set in R, then filter on DB
-      allowed <- ranked %>% dplyr::distinct(.data$rank_val) %>% dplyr::collect() %>% dplyr::pull()
-      allowed <- allowed[ as.logical(filter_rank(allowed)) ]
-      ranked  <- ranked %>% dplyr::filter(.data$rank_val %in% !!allowed)
+      allowed <- ranked %>%
+        dplyr::distinct(.data$rank_val) %>%
+        dplyr::collect() %>%
+        dplyr::pull()
+      allowed <- allowed[as.logical(filter_rank(allowed))]
+      ranked <- ranked %>% dplyr::filter(.data$rank_val %in% !!allowed)
     } else if (!is.null(filter_rank)) {
-      ranked  <- ranked %>% dplyr::filter(.data$rank_val %in% !!filter_rank)
+      ranked <- ranked %>% dplyr::filter(.data$rank_val %in% !!filter_rank)
     }
 
     # ---- aggregate on DB, then collect compact table ----
@@ -147,7 +158,9 @@ compute_beta_diversity.phip_data <- function(x,
       dplyr::summarise(abund = sum(.data$value), .groups = "drop") %>%
       dplyr::collect()
 
-    if (!nrow(agg)) return(NULL)
+    if (!nrow(agg)) {
+      return(NULL)
+    }
 
     # ---- row metadata (small): group + time + carry_cols ----
     meta_cols <- unique(c("sample_id", group_col, if (has_time) time_col, carry_cols))
@@ -160,7 +173,7 @@ compute_beta_diversity.phip_data <- function(x,
     sm$sample_id <- as.character(sm$sample_id)
     if (has_time && time_col %in% names(sm)) {
       sm[[time_col]] <- factor(as.character(sm[[time_col]]), levels = tlev)
-      sm$time_fac    <- sm[[time_col]]
+      sm$time_fac <- sm[[time_col]]
     }
     if (!rlang::is_installed("data.table")) stop("Install data.table for this path.")
     #' @importFrom data.table as.data.table dcast set setDT
@@ -184,8 +197,8 @@ compute_beta_diversity.phip_data <- function(x,
 
     # ---- PCoA ----
     pcoa <- stats::cmdscale(dist_obj, eig = TRUE, k = 2)
-    eig  <- pcoa$eig
-    ve   <- if (is.null(eig) || sum(eig) == 0) c(NA_real_, NA_real_) else round(100 * eig[1:2] / sum(eig), 2)
+    eig <- pcoa$eig
+    ve <- if (is.null(eig) || sum(eig) == 0) c(NA_real_, NA_real_) else round(100 * eig[1:2] / sum(eig), 2)
     print(proc.time() - t0)
     cat("\n\n")
     cat("# 5) stats: adonis2, betadisper, permutest")
@@ -194,7 +207,8 @@ compute_beta_diversity.phip_data <- function(x,
     run_perm <- isTRUE(permutations > 0) && length(unique(sm$group)) > 1 && nrow(sm) >= 4
     if (run_perm && has_time && "time_fac" %in% names(sm)) {
       perm <- try(vegan::adonis2(dist_obj ~ group + time_fac + group:time_fac,
-                                 data = sm_df, permutations = permutations), silent = TRUE)
+        data = sm_df, permutations = permutations
+      ), silent = TRUE)
       disp_vec <- interaction(sm$group, sm$time_fac, drop = TRUE)
     } else if (run_perm) {
       perm <- try(vegan::adonis2(dist_obj ~ group, data = sm_df, permutations = permutations), silent = TRUE)
@@ -205,7 +219,9 @@ compute_beta_diversity.phip_data <- function(x,
     }
 
     disp <- try(vegan::betadisper(dist_obj, disp_vec), silent = TRUE)
-    p_disp <- if (inherits(disp, "try-error")) NA_real_ else {
+    p_disp <- if (inherits(disp, "try-error")) {
+      NA_real_
+    } else {
       out <- try(vegan::permutest(disp, permutations = permutations), silent = TRUE)
       if (inherits(out, "try-error")) NA_real_ else out$tab$`Pr(>F)`[1]
     }
@@ -213,20 +229,24 @@ compute_beta_diversity.phip_data <- function(x,
     # ---- tidy outputs ----
     scores <- tibble::tibble(
       sample_id = rownames(pcoa$points),
-      pcoa1     = pcoa$points[,1],
-      pcoa2     = pcoa$points[,2]
+      pcoa1     = pcoa$points[, 1],
+      pcoa2     = pcoa$points[, 2]
     ) %>%
       dplyr::left_join(sm, by = "sample_id") %>%
       dplyr::mutate(rank = rank, .before = 1)
 
     # dispersion distances table
-    disp_df <- if (!is.null(disp) && !inherits(disp, "try-error"))
-      tibble::tibble(sample_id = names(disp$distances),
-                     distance  = as.numeric(disp$distances),
-                     group_disp= as.character(disp$group),
-                     rank      = rank) %>%
-      dplyr::left_join(sm %>% dplyr::select(sample_id, group, dplyr::any_of("time_fac")), by = "sample_id")
-    else tibble::tibble(sample_id=character(), distance=double(), group_disp=character(), rank=character())
+    disp_df <- if (!is.null(disp) && !inherits(disp, "try-error")) {
+      tibble::tibble(
+        sample_id = names(disp$distances),
+        distance = as.numeric(disp$distances),
+        group_disp = as.character(disp$group),
+        rank = rank
+      ) %>%
+        dplyr::left_join(sm %>% dplyr::select(sample_id, group, dplyr::any_of("time_fac")), by = "sample_id")
+    } else {
+      tibble::tibble(sample_id = character(), distance = double(), group_disp = character(), rank = character())
+    }
 
     perm_tbl <- if (is.null(perm) || inherits(perm, "try-error")) {
       tibble::tibble(rank = rank, term = character(), p_value = numeric())
@@ -235,11 +255,11 @@ compute_beta_diversity.phip_data <- function(x,
     }
 
     list(
-      rank      = rank,
-      scores    = scores,
-      var_exp   = tibble::tibble(rank = rank, pcoa1 = ve[1], pcoa2 = ve[2]),
-      tests     = perm_tbl,
-      dispersion= disp_df
+      rank = rank,
+      scores = scores,
+      var_exp = tibble::tibble(rank = rank, pcoa1 = ve[1], pcoa2 = ve[2]),
+      tests = perm_tbl,
+      dispersion = disp_df
     )
   }
 
@@ -261,27 +281,28 @@ compute_beta_diversity.phip_data <- function(x,
 #' Faceted PCoA (group base color; per-time light→dark shades; solid ellipses)
 #' @export
 plot_beta_pcoa <- function(beta,
-                           group_col           = "group",
-                           custom_colors       = NULL,   # named by group
-                           ellipse             = TRUE,
-                           show_legend         = TRUE,   # legend for Group | Time
-                           facet_scales        = "fixed",
-                           ncol                = 2,
-                           time_col            = NULL,   # if NULL, tries 'time_fac'
-                           centroid_size       = 6,
-                           centroid_stroke     = 1.1,
+                           group_col = "group",
+                           custom_colors = NULL, # named by group
+                           ellipse = TRUE,
+                           show_legend = TRUE, # legend for Group | Time
+                           facet_scales = "fixed",
+                           ncol = 2,
+                           time_col = NULL, # if NULL, tries 'time_fac'
+                           centroid_size = 6,
+                           centroid_stroke = 1.1,
                            draw_centroid_paths = TRUE,
-                           lighten_from        = 0.85) { # stronger lightening for clarity
+                           lighten_from = 0.85) { # stronger lightening for clarity
   stopifnot(inherits(beta, "phip_beta"))
   df <- beta$pcoa
   ve <- beta$var_explained
 
   # facet strip text with explained variance
   df_lab <- dplyr::left_join(
-    ve, dplyr::tibble(rank = unique(df$rank)), by = "rank"
+    ve, dplyr::tibble(rank = unique(df$rank)),
+    by = "rank"
   ) %>%
     dplyr::mutate(strip = sprintf("%s  (PCoA 1 %s%%, PCoA 2 %s%%)", rank, pcoa1, pcoa2))
-  df <- dplyr::left_join(df, df_lab[,c("rank","strip")], by = "rank")
+  df <- dplyr::left_join(df, df_lab[, c("rank", "strip")], by = "rank")
 
   gsym <- rlang::sym(group_col)
 
@@ -311,10 +332,14 @@ plot_beta_pcoa <- function(beta,
 
   # helper to lighten
   .make_shades <- function(base, n, from = 0.85) {
-    if (n <= 1) return(rep(base, n))
+    if (n <= 1) {
+      return(rep(base, n))
+    }
     if (rlang::is_installed("colorspace")) {
-      vapply(seq(from, 0, length.out = n),
-             function(a) colorspace::lighten(base, amount = a), character(1))
+      vapply(
+        seq(from, 0, length.out = n),
+        function(a) colorspace::lighten(base, amount = a), character(1)
+      )
     } else {
       grDevices::colorRampPalette(c("#FFFFFF", base))(n)
     }
@@ -340,7 +365,8 @@ plot_beta_pcoa <- function(beta,
 
     # gt factor with levels exactly those present
     df$gt <- factor(paste(df[[group_col]], df[[time_col]], sep = " | "),
-                    levels = names(shades))
+      levels = names(shades)
+    )
   } else {
     # no time: color by group only
     shades <- base_cols
@@ -354,7 +380,8 @@ plot_beta_pcoa <- function(beta,
       dplyr::group_by(rank, !!gsym, !!tsym) %>%
       dplyr::summarise(pcoa1 = mean(.data$pcoa1), pcoa2 = mean(.data$pcoa2), .groups = "drop") %>%
       dplyr::mutate(gt = factor(paste(.data[[group_col]], .data[[time_col]], sep = " | "),
-                                levels = levels(df$gt))) %>%
+        levels = levels(df$gt)
+      )) %>%
       dplyr::arrange(rank, !!gsym, !!tsym)
   } else {
     cents <- df %>%
@@ -374,9 +401,11 @@ plot_beta_pcoa <- function(beta,
   if (isTRUE(ellipse)) {
     p <- p + ggplot2::stat_ellipse(
       data = df,
-      ggplot2::aes(x = .data$pcoa1, y = .data$pcoa2,
-                   group = interaction(.data$rank, .data$gt, drop = TRUE),
-                   color = .data$gt),
+      ggplot2::aes(
+        x = .data$pcoa1, y = .data$pcoa2,
+        group = interaction(.data$rank, .data$gt, drop = TRUE),
+        color = .data$gt
+      ),
       type = "t", level = 0.95, linewidth = 0.9, linetype = "solid", show.legend = FALSE
     )
   }
@@ -393,17 +422,21 @@ plot_beta_pcoa <- function(beta,
     if (has_time) {
       p <- p + ggplot2::geom_path(
         data = cents,
-        ggplot2::aes(x = .data$pcoa1, y = .data$pcoa2,
-                     group = interaction(.data$rank, .data[[group_col]], drop = TRUE),
-                     color = .data$gt),
+        ggplot2::aes(
+          x = .data$pcoa1, y = .data$pcoa2,
+          group = interaction(.data$rank, .data[[group_col]], drop = TRUE),
+          color = .data$gt
+        ),
         linewidth = 0.9, alpha = 0.9
       )
     } else {
       p <- p + ggplot2::geom_path(
         data = cents,
-        ggplot2::aes(x = .data$pcoa1, y = .data$pcoa2,
-                     group = interaction(.data$rank, .data[[group_col]], drop = TRUE),
-                     color = .data$gt),
+        ggplot2::aes(
+          x = .data$pcoa1, y = .data$pcoa2,
+          group = interaction(.data$rank, .data[[group_col]], drop = TRUE),
+          color = .data$gt
+        ),
         linewidth = 0.9, alpha = 0.9
       )
     }
@@ -411,14 +444,18 @@ plot_beta_pcoa <- function(beta,
 
   # manual palette tied to gt levels (works in all layers)
   p <- p +
-    ggplot2::scale_color_manual(values = shades, name = "Group | Time",
-                                drop = TRUE, guide = if (show_legend) "legend" else "none") +
+    ggplot2::scale_color_manual(
+      values = shades, name = "Group | Time",
+      drop = TRUE, guide = if (show_legend) "legend" else "none"
+    ) +
     ggplot2::scale_fill_manual(values = shades, drop = TRUE, guide = "none") +
     ggplot2::labs(x = "PCoA 1", y = "PCoA 2") +
     ggplot2::theme_bw(base_size = 14) +
-    ggplot2::theme(panel.grid = ggplot2::element_blank(),
-                   legend.position = if (show_legend) "right" else "none") +
-    ggplot2::facet_wrap(~ strip, ncol = ncol, scales = facet_scales)
+    ggplot2::theme(
+      panel.grid = ggplot2::element_blank(),
+      legend.position = if (show_legend) "right" else "none"
+    ) +
+    ggplot2::facet_wrap(~strip, ncol = ncol, scales = facet_scales)
 
   p
 }
@@ -427,18 +464,19 @@ plot_beta_pcoa <- function(beta,
 #' Uses group base colors, shaded by time within each group (light → dark).
 #' @export
 plot_beta_dispersion <- function(beta,
-                                 group_col      = "group",
-                                 custom_colors  = NULL,   # named by group
-                                 facet_scales   = "free_y",
-                                 ncol           = 2,
-                                 time_col       = NULL,   # if NULL, tries 'time_fac'
-                                 show_legend    = TRUE,
-                                 lighten_from   = 0.85) { # stronger lightening for clarity
+                                 group_col = "group",
+                                 custom_colors = NULL, # named by group
+                                 facet_scales = "free_y",
+                                 ncol = 2,
+                                 time_col = NULL, # if NULL, tries 'time_fac'
+                                 show_legend = TRUE,
+                                 lighten_from = 0.85) { # stronger lightening for clarity
   stopifnot(inherits(beta, "phip_beta"))
   df <- beta$dispersion
   if (!nrow(df)) {
-    return(ggplot2::ggplot() + ggplot2::theme_void() +
-             ggplot2::labs(title = "No dispersion available"))
+    return(ggplot2::ggplot() +
+      ggplot2::theme_void() +
+      ggplot2::labs(title = "No dispersion available"))
   }
 
   # prefer the grouping actually used by betadisper if present (e.g., group×time)
@@ -469,10 +507,14 @@ plot_beta_dispersion <- function(beta,
 
   # lightening helper
   .make_shades <- function(base, n, from = 0.85) {
-    if (n <= 1) return(rep(base, n))
+    if (n <= 1) {
+      return(rep(base, n))
+    }
     if (rlang::is_installed("colorspace")) {
-      vapply(seq(from, 0, length.out = n),
-             function(a) colorspace::lighten(base, amount = a), character(1))
+      vapply(
+        seq(from, 0, length.out = n),
+        function(a) colorspace::lighten(base, amount = a), character(1)
+      )
     } else {
       grDevices::colorRampPalette(c("#FFFFFF", base))(n)
     }
@@ -496,7 +538,8 @@ plot_beta_dispersion <- function(beta,
     shades <- unlist(shades_list, use.names = TRUE)
 
     df$gt <- factor(paste(df[[group_col]], df[[time_col]], sep = " | "),
-                    levels = names(shades))
+      levels = names(shades)
+    )
     x_lab <- "Group | Time"
   } else {
     shades <- base_cols
@@ -516,8 +559,7 @@ plot_beta_dispersion <- function(beta,
       panel.grid = ggplot2::element_blank(),
       axis.text.x = ggplot2::element_text(angle = 45, vjust = 0.6, hjust = 0.5)
     ) +
-    ggplot2::facet_wrap(~ rank, ncol = ncol, scales = facet_scales)
+    ggplot2::facet_wrap(~rank, ncol = ncol, scales = facet_scales)
 
   p
 }
-

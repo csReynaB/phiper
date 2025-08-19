@@ -248,9 +248,9 @@ validate_phip_data <- function(x,
     if (isTRUE(auto_expand)) {
       tbl_expanded <- phip_expand_full_grid(
         tbl,
-        key_col   = "sample_id",
-        id_col    = "peptide_id",
-        add_exist = TRUE,              # <- new flag: keep binary column
+        key_col = "sample_id",
+        id_col = "peptide_id",
+        add_exist = TRUE, # <- new flag: keep binary column
         exist_col = "exist",
         fill_override = list(
           present      = 0L,
@@ -273,7 +273,6 @@ validate_phip_data <- function(x,
         x$data_long <- tbl_expanded
       }
       x$meta$full_cross <- TRUE
-
     } else {
       cli::cli_warn(sprintf(
         "Counts table is not a full peptide × sample grid (%s / %s rows).",
@@ -290,26 +289,35 @@ validate_phip_data <- function(x,
 
 # 1) keep your existing table-based function but rename it internally:
 .phip_expand_full_grid_impl <- function(tbl,
-                                        key_col     = "sample_id",
-                                        id_col      = "peptide_id",
+                                        key_col = "sample_id",
+                                        id_col = "peptide_id",
                                         fill_override = NULL,
-                                        add_exist     = FALSE,
-                                        exist_col     = "exist") {
+                                        add_exist = FALSE,
+                                        exist_col = "exist") {
   stopifnot(all(c(key_col, id_col) %in% colnames(tbl)))
   .data <- rlang::.data
   key_sym <- rlang::sym(key_col)
-  id_sym  <- rlang::sym(id_col)
+  id_sym <- rlang::sym(id_col)
   row_exists_sym <- rlang::sym(".row_exists")
 
   # 0) tiny sample to detect types
   sample0 <- if (inherits(tbl, "tbl_lazy")) {
-    tbl |> utils::head(0) |> dplyr::collect() |> as.data.frame()
-  } else as.data.frame(tbl)
+    tbl |>
+      utils::head(0) |>
+      dplyr::collect() |>
+      as.data.frame()
+  } else {
+    as.data.frame(tbl)
+  }
 
   # 1) robust cross (only key & id survive)
   make_cross <- function(tbl) {
-    key_tbl <- tbl |> dplyr::distinct(!!key_sym) |> dplyr::transmute(!!key_sym, dummy = 1L)
-    id_tbl  <- tbl |> dplyr::distinct(!!id_sym)  |> dplyr::transmute(!!id_sym,  dummy = 1L)
+    key_tbl <- tbl |>
+      dplyr::distinct(!!key_sym) |>
+      dplyr::transmute(!!key_sym, dummy = 1L)
+    id_tbl <- tbl |>
+      dplyr::distinct(!!id_sym) |>
+      dplyr::transmute(!!id_sym, dummy = 1L)
     key_tbl |>
       dplyr::inner_join(id_tbl, by = "dummy") |>
       dplyr::select(-dummy) |>
@@ -324,8 +332,9 @@ validate_phip_data <- function(x,
       dplyr::group_by(dplyr::across(dplyr::all_of(key_col))) |>
       dplyr::summarise(
         dplyr::across(dplyr::all_of(candidate_cols),
-                      ~ dplyr::n_distinct(.x, na.rm = FALSE) == 1L,
-                      .names = "const_{.col}"),
+          ~ dplyr::n_distinct(.x, na.rm = FALSE) == 1L,
+          .names = "const_{.col}"
+        ),
         .groups = "drop"
       ) |>
       dplyr::collect()
@@ -340,9 +349,13 @@ validate_phip_data <- function(x,
   non_recyclable_cols <- setdiff(candidate_cols, recyclable_cols)
 
   sample_meta <- if (length(recyclable_cols)) {
-    tbl |> dplyr::select(dplyr::all_of(c(key_col, recyclable_cols))) |> dplyr::distinct()
+    tbl |>
+      dplyr::select(dplyr::all_of(c(key_col, recyclable_cols))) |>
+      dplyr::distinct()
   } else {
-    tbl |> dplyr::select(dplyr::all_of(key_col)) |> dplyr::distinct()
+    tbl |>
+      dplyr::select(dplyr::all_of(key_col)) |>
+      dplyr::distinct()
   }
 
   base_cells <- tbl |>
@@ -352,22 +365,24 @@ validate_phip_data <- function(x,
   cross_tbl <- make_cross(tbl)
 
   # 3) joins
-  by_key  <- if (utils::packageVersion("dplyr") >= "1.1.0") dplyr::join_by(!!key_sym) else setNames(key_col, key_col)
+  by_key <- if (utils::packageVersion("dplyr") >= "1.1.0") dplyr::join_by(!!key_sym) else setNames(key_col, key_col)
   by_both <- if (utils::packageVersion("dplyr") >= "1.1.0") dplyr::join_by(!!key_sym, !!id_sym) else setNames(c(key_col, id_col), c(key_col, id_col))
 
   out <- cross_tbl |>
     dplyr::left_join(sample_meta, by = by_key) |>
-    dplyr::left_join(base_cells,   by = by_both)
+    dplyr::left_join(base_cells, by = by_both)
 
   # 4) fill introduced rows based on .row_exists
-  common_measurement_names <- c("present", "fold_change",
-                                "input_count", "hit_count",
-                                "counts_input", "counts_hit")
+  common_measurement_names <- c(
+    "present", "fold_change",
+    "input_count", "hit_count",
+    "counts_input", "counts_hit"
+  )
   have_cols <- intersect(non_recyclable_cols, colnames(out))
   fill_candidates <- intersect(common_measurement_names, colnames(out))
   more_candidates <- setdiff(have_cols, fill_candidates)
 
-  is_num <- function(x) inherits(x, c("numeric","integer","double","integer64"))
+  is_num <- function(x) inherits(x, c("numeric", "integer", "double", "integer64"))
   is_lgl <- function(x) is.logical(x)
   to_fill_num <- unique(c(
     intersect(fill_candidates, names(sample0)[vapply(sample0, is_num, logical(1))]),
@@ -416,8 +431,9 @@ validate_phip_data <- function(x,
     exist_name <- exist_col
     if (exist_name %in% colnames(out)) {
       exist_name <- paste0(exist_name, "_grid")
-      if (requireNamespace("cli", quietly = TRUE))
+      if (requireNamespace("cli", quietly = TRUE)) {
         cli::cli_warn(sprintf("Column '%s' exists; using '%s' for existence flag.", exist_col, exist_name))
+      }
     }
     exist_sym <- rlang::sym(exist_name)
     out <- out |>
@@ -482,16 +498,16 @@ phip_expand_full_grid.data.frame <- function(x,
                                              key_col = "sample_id",
                                              id_col = "peptide_id",
                                              fill_override = NULL,
-                                             add_exist     = FALSE,
-                                             exist_col     = "exist",
+                                             add_exist = FALSE,
+                                             exist_col = "exist",
                                              ...) {
   .phip_expand_full_grid_impl(x,
-                              key_col = key_col,
-                              id_col  = id_col,
-                              fill_override = fill_override,
-                              add_exist     = add_exist,
-                              exist_col     = exist_col
-                              )
+    key_col = key_col,
+    id_col = id_col,
+    fill_override = fill_override,
+    add_exist = add_exist,
+    exist_col = exist_col
+  )
 }
 
 # 4) lazy DBI/dbplyr table method
@@ -501,16 +517,16 @@ phip_expand_full_grid.tbl_lazy <- function(x,
                                            key_col = "sample_id",
                                            id_col = "peptide_id",
                                            fill_override = NULL,
-                                           add_exist     = FALSE,
-                                           exist_col     = "exist",
+                                           add_exist = FALSE,
+                                           exist_col = "exist",
                                            ...) {
   .phip_expand_full_grid_impl(x,
-                              key_col = key_col,
-                              id_col  = id_col,
-                              fill_override = fill_override,
-                              add_exist     = add_exist,
-                              exist_col     = exist_col
-                              )
+    key_col = key_col,
+    id_col = id_col,
+    fill_override = fill_override,
+    add_exist = add_exist,
+    exist_col = exist_col
+  )
 }
 
 # 5) <phip_data> method — updates and returns the object
@@ -518,10 +534,10 @@ phip_expand_full_grid.tbl_lazy <- function(x,
 #' @export
 phip_expand_full_grid.phip_data <- function(x,
                                             key_col = "sample_id",
-                                            id_col  = "peptide_id",
+                                            id_col = "peptide_id",
                                             fill_override = NULL,
-                                            add_exist     = FALSE,
-                                            exist_col     = "exist",
+                                            add_exist = FALSE,
+                                            exist_col = "exist",
                                             ...) {
   # expand (stays lazy)
   tbl_expanded <- .phip_expand_full_grid_impl(

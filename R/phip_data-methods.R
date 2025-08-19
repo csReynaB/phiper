@@ -275,9 +275,9 @@ ungroup.phip_data <- function(x, ...) {
 ###############################################################################
 .cli_yesno <- function(question,
                        yes = c("y", "yes"),
-                       no  = c("n", "no")) {
-
-  yes <- tolower(yes);  no <- tolower(no)
+                       no = c("n", "no")) {
+  yes <- tolower(yes)
+  no <- tolower(no)
 
   repeat {
     cli::cli_text(
@@ -285,8 +285,12 @@ ungroup.phip_data <- function(x, ...) {
       .envir = list(question = question)
     )
     answer <- tolower(trimws(readline(cli::style_dim("→ "))))
-    if (answer %in% yes) return(TRUE)
-    if (answer %in% no)  return(FALSE)
+    if (answer %in% yes) {
+      return(TRUE)
+    }
+    if (answer %in% no) {
+      return(FALSE)
+    }
     cli::cli_alert_danger("Please answer {.strong y} or {.strong n}.")
   }
 }
@@ -320,23 +324,23 @@ ungroup.phip_data <- function(x, ...) {
 merge.phip_data <- function(x, y,
                             ...,
                             confirm = interactive()) {
-
-  y    <- .extract_data_long(y)
+  y <- .extract_data_long(y)
 
   # -----------------------------------------------------------------------
   #  Base merge (potentially memory-hungry) ------------------------------
   # -----------------------------------------------------------------------
-    if (confirm && interactive()) {
-      .cli_warn("`merge()` copies both tables in full; this may exhaust RAM.")
-      ok <- .cli_yesno("Proceed with base::merge()?")
-      if (!isTRUE(ok)) {
-        chk::abort_chk("Merge aborted.  Use `dplyr` (or another join) for
+  if (confirm && interactive()) {
+    .cli_warn("`merge()` copies both tables in full; this may exhaust RAM.")
+    ok <- .cli_yesno("Proceed with base::merge()?")
+    if (!isTRUE(ok)) {
+      chk::abort_chk("Merge aborted.  Use `dplyr` (or another join) for
              a memory-efficient alternative.",
-             call. = FALSE)
-      }
+        call. = FALSE
+      )
     }
+  }
 
-    merged_tbl <- base::merge(x$data_long, y, ...)
+  merged_tbl <- base::merge(x$data_long, y, ...)
 
   .modify_pd(x, merged_tbl)
 }
@@ -345,11 +349,12 @@ merge.phip_data <- function(x, y,
 # Allow users to write left_join(pd1, pd2, ...) just like in regular dplyr.
 
 #' @importFrom dplyr left_join right_join inner_join full_join semi_join anti_join
-joins <- c("left_join", "right_join", "inner_join",
-           "full_join", "semi_join", "anti_join")
+joins <- c(
+  "left_join", "right_join", "inner_join",
+  "full_join", "semi_join", "anti_join"
+)
 
 for (join in joins) {
-
   ## build the method name, e.g. "left_join.phip_data"
   method_name <- paste0(join, ".phip_data")
 
@@ -357,7 +362,7 @@ for (join in joins) {
   fn <- eval(substitute(
     function(x, y, ...) {
       y <- .extract_data_long(y)
-      join_fun <- getExportedValue("dplyr", JOIN)   # <— fetch from dplyr
+      join_fun <- getExportedValue("dplyr", JOIN) # <— fetch from dplyr
       .modify_pd(x, join_fun(x$data_long, y, ...))
     },
     list(JOIN = join)
@@ -369,7 +374,8 @@ for (join in joins) {
   ## make sure the S3 method is registered when the package is loaded
   if (exists("registerS3method", mode = "function")) {
     registerS3method(join, "phip_data", fn,
-                     envir = asNamespace(utils::packageName()))
+      envir = asNamespace(utils::packageName())
+    )
   }
 }
 

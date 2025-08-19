@@ -17,7 +17,7 @@ plot_enrichment_counts <- function(features_target,
 #' @param sample_meta optional data.frame with columns c("sample_id", group_col)
 #'   to be used if group_col is not present in x$data_long
 #' @export
-plot_enrichment_counts.phip_data <- function(features_target,   # actually <phip_data> x
+plot_enrichment_counts.phip_data <- function(features_target, # actually <phip_data> x
                                              group_col,
                                              group_cols = group_col,
                                              prevalence_threshold = 0,
@@ -28,14 +28,16 @@ plot_enrichment_counts.phip_data <- function(features_target,   # actually <phip
   x <- features_target
   stopifnot(inherits(x, "phip_data"))
   .data <- rlang::.data
-  grp  <- rlang::sym(group_col)
+  grp <- rlang::sym(group_col)
 
   tbl <- x$data_long
 
   # attach external labels if needed
   if (!group_col %in% colnames(tbl)) {
-    stopifnot(!is.null(sample_meta),
-              all(c("sample_id", group_col) %in% colnames(sample_meta)))
+    stopifnot(
+      !is.null(sample_meta),
+      all(c("sample_id", group_col) %in% colnames(sample_meta))
+    )
     lab <- sample_meta |>
       dplyr::select(sample_id, dplyr::all_of(group_col)) |>
       dplyr::distinct()
@@ -75,7 +77,7 @@ plot_enrichment_counts.phip_data <- function(features_target,   # actually <phip
 
   # The line above used a placeholder to align schema; recompute n_peptides5 properly after collect
   cohort_sizes_df <- cohort_sizes |> dplyr::collect()
-  pep_counts_df   <- pep_counts   |> dplyr::collect()
+  pep_counts_df <- pep_counts |> dplyr::collect()
 
   thresholds_df <- cohort_sizes_df |>
     dplyr::mutate(thresh = ceiling(.data$n_samples * 0.05)) |>
@@ -103,45 +105,53 @@ plot_enrichment_counts.phip_data <- function(features_target,   # actually <phip
       expand = ggplot2::expansion(mult = c(0, .15))
     ) +
     ggplot2::annotation_logticks(sides = "l", scaled = TRUE) +
-    { if (missing(custom_colors) || is.null(custom_colors))
-      ggplot2::scale_fill_discrete()
-      else ggplot2::scale_fill_manual(values = custom_colors) } +
+    {
+      if (missing(custom_colors) || is.null(custom_colors)) {
+        ggplot2::scale_fill_discrete()
+      } else {
+        ggplot2::scale_fill_manual(values = custom_colors)
+      }
+    } +
     ggplot2::labs(
       x = "# of individuals",
       y = expression("# of significantly bound peptides (" * log[10] * ")")
     ) +
     ggplot2::geom_segment(
       data = thresholds_df,
-      ggplot2::aes(x = .data$thresh, xend = .data$n_samples,
-                   y = .data$n_peptides5, yend = .data$n_peptides5),
+      ggplot2::aes(
+        x = .data$thresh, xend = .data$n_samples,
+        y = .data$n_peptides5, yend = .data$n_peptides5
+      ),
       inherit.aes = FALSE,
-      linetype    = "dashed",
-      color       = "black",
-      size        = 0.4,
-      arrow       = ggplot2::arrow(length = grid::unit(0.1, "cm"), ends = "both")
+      linetype = "dashed",
+      color = "black",
+      size = 0.4,
+      arrow = ggplot2::arrow(length = grid::unit(0.1, "cm"), ends = "both")
     ) +
     ggplot2::geom_text(
-      data  = thresholds_df,
-      ggplot2::aes(x = (.data$thresh + .data$n_samples) / 2,
-                   y = .data$n_peptides5,
-                   label = paste0(.data$n_peptides5, " peptides in \u22655%")),
+      data = thresholds_df,
+      ggplot2::aes(
+        x = (.data$thresh + .data$n_samples) / 2,
+        y = .data$n_peptides5,
+        label = paste0(.data$n_peptides5, " peptides in \u22655%")
+      ),
       inherit.aes = FALSE,
       vjust = -0.5,
-      size  = 4
+      size = 4
     ) +
-    ggplot2::facet_wrap(~ Cohort, ncol = 2, scales = "free_x") +
+    ggplot2::facet_wrap(~Cohort, ncol = 2, scales = "free_x") +
     ggplot2::theme_bw(base_size = 13) +
     ggplot2::theme(
-      legend.position   = "none",
-      strip.background  = ggplot2::element_blank(),
-      strip.text        = ggplot2::element_text(face = "bold", size = 14, colour = "black"),
-      panel.grid.major  = ggplot2::element_line(color = "grey90", linetype = "solid"),
-      panel.grid.minor  = ggplot2::element_blank(),
-      axis.text.y.left  = ggplot2::element_text(size = 13),
-      axis.text.x.bottom= ggplot2::element_text(size = 13),
-      axis.title.y      = ggplot2::element_text(size = 14),
-      axis.title.x      = ggplot2::element_text(size = 14, margin = ggplot2::margin(t = 0)),
-      plot.margin       = ggplot2::margin(0, 3, 0, 0, unit = "pt")
+      legend.position = "none",
+      strip.background = ggplot2::element_blank(),
+      strip.text = ggplot2::element_text(face = "bold", size = 14, colour = "black"),
+      panel.grid.major = ggplot2::element_line(color = "grey90", linetype = "solid"),
+      panel.grid.minor = ggplot2::element_blank(),
+      axis.text.y.left = ggplot2::element_text(size = 13),
+      axis.text.x.bottom = ggplot2::element_text(size = 13),
+      axis.title.y = ggplot2::element_text(size = 14),
+      axis.title.x = ggplot2::element_text(size = 14, margin = ggplot2::margin(t = 0)),
+      plot.margin = ggplot2::margin(0, 3, 0, 0, unit = "pt")
     )
 }
 
@@ -158,7 +168,9 @@ plot_enrichment_counts_many <- function(x, group_cols, save_dir = NULL, ...) {
     if (!is.null(save_dir)) {
       fs::dir_create(save_dir)
       ggplot2::ggsave(file.path(save_dir, paste0("enrichment_", gc, ".pdf")),
-                      p, width = 8, height = 6, limitsize = FALSE)
+        p,
+        width = 8, height = 6, limitsize = FALSE
+      )
     }
     print(p)
     p
@@ -181,10 +193,13 @@ plot_enrichment_counts_many <- function(x, group_cols, save_dir = NULL, ...) {
       try(DBI::dbExecute(main_con, sprintf("ATTACH '%s' AS %s;", pep_db_path, schema_alias)), silent = TRUE)
 
       # get the base table name (e.g., "peptide_meta")
-      base_name <- tryCatch({
-        nm <- dbplyr::remote_name(x$peptide_library)
-        if (is.null(nm) || !nzchar(nm)) "peptide_meta" else sub("^.*\\.", "", nm)
-      }, error = function(e) "peptide_meta")
+      base_name <- tryCatch(
+        {
+          nm <- dbplyr::remote_name(x$peptide_library)
+          if (is.null(nm) || !nzchar(nm)) "peptide_meta" else sub("^.*\\.", "", nm)
+        },
+        error = function(e) "peptide_meta"
+      )
 
       # IMPORTANT: use a subquery to avoid DBI::dbExistsTable(schema, table) checks
       return(
@@ -211,21 +226,21 @@ compute_alpha_diversity <- function(x, ...) UseMethod("compute_alpha_diversity")
 #' @export
 compute_alpha_diversity.phip_data <- function(x,
                                               group_col,
-                                              ranks        = "peptide",
-                                              present_by   = c("exist", "fold_change"),
+                                              ranks = "peptide",
+                                              present_by = c("exist", "fold_change"),
                                               fc_threshold = 0,
-                                              sample_meta  = NULL,
-                                              shannon_log  = c("ln","log2","log10"),
-                                              carry_cols   = NULL) {
+                                              sample_meta = NULL,
+                                              shannon_log = c("ln", "log2", "log10"),
+                                              carry_cols = NULL) {
   stopifnot(inherits(x, "phip_data"))
-  present_by  <- match.arg(present_by)
+  present_by <- match.arg(present_by)
   shannon_log <- match.arg(shannon_log)
 
   # symbols
   sid <- rlang::sym("sample_id")
   pid <- rlang::sym("peptide_id")
   grp <- rlang::sym(group_col)
-  rv  <- rlang::sym("rank_val")
+  rv <- rlang::sym("rank_val")
 
   # base table
   tbl <- x$data_long
@@ -261,17 +276,18 @@ compute_alpha_diversity.phip_data <- function(x,
     dplyr::distinct()
 
   # ranks: accept synonyms & split
-  ranks[ranks %in% c("peptide_id","peptideID","peptide_ids")] <- "peptide"
+  ranks[ranks %in% c("peptide_id", "peptideID", "peptide_ids")] <- "peptide"
   ranks_nonpep <- setdiff(unique(ranks), "peptide")
 
   # prepare a compact rank map on the main con (collect + copy_to, robust across DBs)
   map_tbl <- NULL
   if (length(ranks_nonpep)) {
     peplib_cols <- colnames(x$peptide_library)
-    ranks_ok    <- intersect(ranks_nonpep, peplib_cols)
-    ranks_miss  <- setdiff(ranks_nonpep, ranks_ok)
-    if (length(ranks_miss) && rlang::is_installed("cli"))
+    ranks_ok <- intersect(ranks_nonpep, peplib_cols)
+    ranks_miss <- setdiff(ranks_nonpep, ranks_ok)
+    if (length(ranks_miss) && rlang::is_installed("cli")) {
       cli::cli_warn("Skipping ranks not found in peptide_library: {paste(ranks_miss, collapse=', ')}")
+    }
 
     if (length(ranks_ok)) {
       main_con <- dbplyr::remote_con(x$data_long)
@@ -279,7 +295,7 @@ compute_alpha_diversity.phip_data <- function(x,
         dplyr::select(!!pid, dplyr::all_of(ranks_ok)) |>
         dplyr::collect()
       tmp_name <- paste0("peplib_map_tmp_", as.integer(Sys.time()))
-      map_tbl  <- dplyr::copy_to(main_con, map_df, tmp_name, temporary = TRUE, overwrite = TRUE)
+      map_tbl <- dplyr::copy_to(main_con, map_df, tmp_name, temporary = TRUE, overwrite = TRUE)
     }
     ranks <- c("peptide", ranks_ok)
   } else {
@@ -288,7 +304,11 @@ compute_alpha_diversity.phip_data <- function(x,
   ranks <- unique(ranks)
 
   # Shannon base change factor (H_b = H_ln / ln(b))
-  ln_base <- switch(shannon_log, ln = 1.0, log2 = log(2), log10 = log(10))
+  ln_base <- switch(shannon_log,
+    ln = 1.0,
+    log2 = log(2),
+    log10 = log(10)
+  )
 
   # helper: compute one rank
   compute_one <- function(rank) {
@@ -318,15 +338,23 @@ compute_alpha_diversity.phip_data <- function(x,
         dplyr::group_by(sample_id, cohort) |>
         dplyr::summarise(
           richness = dplyr::n_distinct(rank_val),
-          H_ln     = { p <- n / sum(n); -sum(p * log(p)) },
-          simpson  = { p <- n / sum(n); 1 - sum(p * p) },
-          .groups  = "drop"
+          H_ln = {
+            p <- n / sum(n)
+            -sum(p * log(p))
+          },
+          simpson = {
+            p <- n / sum(n)
+            1 - sum(p * p)
+          },
+          .groups = "drop"
         ) |>
         dplyr::mutate(shannon = H_ln / ln_base) |>
         dplyr::select(-H_ln)
     } else {
-      by_sample <- tibble::tibble(sample_id = character(0), cohort = character(0),
-                                  richness = integer(0), shannon = numeric(0), simpson = numeric(0))
+      by_sample <- tibble::tibble(
+        sample_id = character(0), cohort = character(0),
+        richness = integer(0), shannon = numeric(0), simpson = numeric(0)
+      )
     }
 
     # all samples (carry meta columns if requested)
@@ -354,8 +382,10 @@ compute_alpha_diversity.phip_data <- function(x,
     out <- out |>
       dplyr::rename(shannon_diversity = shannon, simpson_diversity = simpson)
 
-    ord <- c("sample_id","group", setdiff(norm(carry_cols), c("sample_id","group")),
-             "rank","richness","shannon_diversity","simpson_diversity")
+    ord <- c(
+      "sample_id", "group", setdiff(norm(carry_cols), c("sample_id", "group")),
+      "rank", "richness", "shannon_diversity", "simpson_diversity"
+    )
     ord <- intersect(ord, names(out))
     out[, ord, drop = FALSE]
   }
@@ -367,57 +397,60 @@ compute_alpha_diversity.phip_data <- function(x,
 #' Requires: ggplot2, dplyr, tidyr; and mgcv (+ mvtnorm) when ci_method = "posterior"
 #' @export
 plot_alpha_diversity <- function(alpha_df,
-                                 metric         = c("richness","shannon_diversity","simpson_diversity",
-                                                    "Richness","Shannon Diversity","Simpson Diversity"),
-                                 group_col      = "group",
-                                 rank_col       = "rank",
-                                 custom_colors  = NULL,
-                                 sig_level      = 0.05,
-                                 label_format   = "p.signif",
-                                 facet_by_rank  = TRUE,
-                                 ncol           = 2,
-                                 facet_scales   = "fixed",
+                                 metric = c(
+                                   "richness", "shannon_diversity", "simpson_diversity",
+                                   "Richness", "Shannon Diversity", "Simpson Diversity"
+                                 ),
+                                 group_col = "group",
+                                 rank_col = "rank",
+                                 custom_colors = NULL,
+                                 sig_level = 0.05,
+                                 label_format = "p.signif",
+                                 facet_by_rank = TRUE,
+                                 ncol = 2,
+                                 facet_scales = "fixed",
                                  # longitudinal:
-                                 time_col       = NULL,
-                                 continuous_mode= c("gam","binned","loess"),
+                                 time_col = NULL,
+                                 continuous_mode = c("gam", "binned", "loess"),
                                  # gam options
-                                 gam_k          = 7,
-                                 gam_se         = TRUE,
+                                 gam_k = 7,
+                                 gam_se = TRUE,
                                  # binned options
-                                 nbins          = 20,
-                                 binwidth       = NULL,
-                                 ci_level       = 0.95,
-                                 stat           = c("mean","median"),
+                                 nbins = 20,
+                                 binwidth = NULL,
+                                 ci_level = 0.95,
+                                 stat = c("mean", "median"),
                                  # CI engine
-                                 ci_method      = c("model","bootstrap","posterior"),
+                                 ci_method = c("model", "bootstrap", "posterior"),
                                  # bootstrap knobs
-                                 boot_R         = 500,
-                                 boot_seed      = 42,
-                                 boot_id_col    = NULL,           # cluster/block bootstrap if provided
-                                 boot_ci        = c("percentile","basic"),
-                                 boot_progress  = TRUE,
-                                 boot_sparse_fallback = c("loess","skip"),
-                                 boot_min_rep_frac    = 0.6,
-                                 boot_smooth_ci       = TRUE,
+                                 boot_R = 500,
+                                 boot_seed = 42,
+                                 boot_id_col = NULL, # cluster/block bootstrap if provided
+                                 boot_ci = c("percentile", "basic"),
+                                 boot_progress = TRUE,
+                                 boot_sparse_fallback = c("loess", "skip"),
+                                 boot_min_rep_frac = 0.6,
+                                 boot_smooth_ci = TRUE,
                                  # posterior bands (GAM)
-                                 posterior_grid_n     = 200,
+                                 posterior_grid_n = 200,
                                  # points on continuous plots
-                                 point_alpha    = 0.25,
+                                 point_alpha = 0.25,
                                  # visuals / constraints
-                                 enforce_nonneg = NULL,           # NULL → TRUE for richness
-                                 ci_fill        = "grey70",       # neutral ribbons
-                                 ci_alpha       = 0.15) {
-
+                                 enforce_nonneg = NULL, # NULL → TRUE for richness
+                                 ci_fill = "grey70", # neutral ribbons
+                                 ci_alpha = 0.15) {
   # ---- arg handling ----
   continuous_mode <- match.arg(continuous_mode)
-  ci_method       <- match.arg(ci_method)
-  boot_ci         <- match.arg(boot_ci)
+  ci_method <- match.arg(ci_method)
+  boot_ci <- match.arg(boot_ci)
   boot_sparse_fallback <- match.arg(boot_sparse_fallback)
-  stat            <- match.arg(stat)
+  stat <- match.arg(stat)
 
-  metric_map <- c("richness"="richness",
-                  "shannon diversity"="shannon_diversity","shannon_diversity"="shannon_diversity",
-                  "simpson diversity"="simpson_diversity","simpson_diversity"="simpson_diversity")
+  metric_map <- c(
+    "richness" = "richness",
+    "shannon diversity" = "shannon_diversity", "shannon_diversity" = "shannon_diversity",
+    "simpson diversity" = "simpson_diversity", "simpson_diversity" = "simpson_diversity"
+  )
   metric_col <- metric_map[[tolower(metric[1])]]
   if (is.null(metric_col)) stop("Unknown metric: ", metric[1])
 
@@ -429,20 +462,26 @@ plot_alpha_diversity <- function(alpha_df,
   rsym <- if (!is.null(rank_col) && rank_col %in% names(alpha_df)) rlang::sym(rank_col) else NULL
 
   ylab <- switch(metric_col,
-                 "richness"="Richness",
-                 "shannon_diversity"="Shannon diversity",
-                 "simpson_diversity"="Simpson diversity (1 - \u03A3 p^2)")
+    "richness" = "Richness",
+    "shannon_diversity" = "Shannon diversity",
+    "simpson_diversity" = "Simpson diversity (1 - \u03A3 p^2)"
+  )
 
   df <- alpha_df
   if (!is.null(rsym)) df[[rank_col]] <- factor(df[[rank_col]])
 
   add_color_scales <- function(p) {
-    if (is.null(custom_colors)) p else
+    if (is.null(custom_colors)) {
+      p
+    } else {
       p + ggplot2::scale_color_manual(values = custom_colors) +
-      ggplot2::scale_fill_manual(values = custom_colors)
+        ggplot2::scale_fill_manual(values = custom_colors)
+    }
   }
   add_facets <- function(p) {
-    if (!facet_by_rank || is.null(rsym) || length(unique(df[[rank_col]])) <= 1) return(p)
+    if (!facet_by_rank || is.null(rsym) || length(unique(df[[rank_col]])) <= 1) {
+      return(p)
+    }
     p + ggplot2::facet_wrap(ggplot2::vars(!!rsym), ncol = ncol, scales = facet_scales)
   }
 
@@ -456,7 +495,11 @@ plot_alpha_diversity <- function(alpha_df,
       sample.int(nrow(d), replace = TRUE)
     }
   }
-  .make_newdata <- function(xvar, xgrid) { nd <- data.frame(xgrid); names(nd) <- xvar; nd }
+  .make_newdata <- function(xvar, xgrid) {
+    nd <- data.frame(xgrid)
+    names(nd) <- xvar
+    nd
+  }
   .pred_grid <- function(x, n = 200) {
     rng <- range(x, na.rm = TRUE)
     if (!is.finite(rng[1]) || !is.finite(rng[2]) || rng[1] == rng[2]) sort(unique(x)) else seq(rng[1], rng[2], length.out = n)
@@ -464,14 +507,15 @@ plot_alpha_diversity <- function(alpha_df,
 
   # ---- bootstrap smoother (per-group) ----
   .bootstrap_smoother <- function(d, xvar, yvar,
-                                  method = c("gam","loess"),
+                                  method = c("gam", "loess"),
                                   k = 7, R = 500, level = 0.95,
                                   seed = NULL, progress = TRUE,
                                   nonneg = FALSE,
-                                  sparse_fallback = c("loess","skip"),
+                                  sparse_fallback = c("loess", "skip"),
                                   min_rep_frac = 0.6,
                                   smooth_ci = TRUE) {
-    method <- match.arg(method); sparse_fallback <- match.arg(sparse_fallback)
+    method <- match.arg(method)
+    sparse_fallback <- match.arg(sparse_fallback)
     if (!is.null(seed)) set.seed(seed)
 
     x <- d[[xvar]]
@@ -479,33 +523,35 @@ plot_alpha_diversity <- function(alpha_df,
 
     # center line
     if (method == "gam") {
-      n_ux  <- length(unique(x))
+      n_ux <- length(unique(x))
       k_eff <- max(3L, min(k, n_ux - 1L))
       if (!is.finite(k_eff) || k_eff < 3L) {
         fit0 <- try(stats::loess(stats::as.formula(paste(yvar, "~", xvar)), data = d, span = 0.75), silent = TRUE)
-        mu0  <- if (!inherits(fit0, "try-error")) {
+        mu0 <- if (!inherits(fit0, "try-error")) {
           as.numeric(predict(fit0, newdata = .make_newdata(xvar, xgrid)))
-        } else rep(NA_real_, length(xgrid))
+        } else {
+          rep(NA_real_, length(xgrid))
+        }
       } else {
         form <- stats::as.formula(paste(yvar, "~ s(", xvar, ", k = ", k_eff, ")", sep = ""))
         fit0 <- mgcv::gam(form, data = d)
-        mu0  <- as.numeric(predict(fit0, newdata = .make_newdata(xvar, xgrid), type = "response"))
+        mu0 <- as.numeric(predict(fit0, newdata = .make_newdata(xvar, xgrid), type = "response"))
       }
     } else {
       fit0 <- stats::loess(stats::as.formula(paste(yvar, "~", xvar)), data = d, span = 0.75)
-      mu0  <- as.numeric(predict(fit0, newdata = .make_newdata(xvar, xgrid)))
+      mu0 <- as.numeric(predict(fit0, newdata = .make_newdata(xvar, xgrid)))
     }
     if (isTRUE(nonneg)) mu0 <- pmax(mu0, 0)
 
     # bootstrap
     mat <- matrix(NA_real_, nrow = length(xgrid), ncol = R)
-    pb  <- if (isTRUE(progress)) utils::txtProgressBar(min = 0, max = R, style = 3) else NULL
+    pb <- if (isTRUE(progress)) utils::txtProgressBar(min = 0, max = R, style = 3) else NULL
 
     for (r in seq_len(R)) {
       idx <- .resample_idx(d)
-      dd  <- d[idx, , drop = FALSE]
+      dd <- d[idx, , drop = FALSE]
       if (method == "gam") {
-        n_ux  <- length(unique(dd[[xvar]]))
+        n_ux <- length(unique(dd[[xvar]]))
         k_eff <- max(3L, min(k, n_ux - 1L))
         if (!is.finite(k_eff) || k_eff < 3L) {
           if (sparse_fallback == "skip") {
@@ -518,7 +564,7 @@ plot_alpha_diversity <- function(alpha_df,
             }
           }
         } else {
-          form  <- stats::as.formula(paste(yvar, "~ s(", xvar, ", k = ", k_eff, ")", sep = ""))
+          form <- stats::as.formula(paste(yvar, "~ s(", xvar, ", k = ", k_eff, ")", sep = ""))
           fit_r <- try(mgcv::gam(form, data = dd), silent = TRUE)
           if (!inherits(fit_r, "try-error")) {
             mat[, r] <- as.numeric(predict(fit_r, newdata = .make_newdata(xvar, xgrid), type = "response"))
@@ -536,8 +582,8 @@ plot_alpha_diversity <- function(alpha_df,
 
     alpha <- 1 - level
     coverage <- rowSums(!is.na(mat))
-    lwr <- apply(mat, 1, stats::quantile, probs = alpha/2,     na.rm = TRUE, type = 6)
-    upr <- apply(mat, 1, stats::quantile, probs = 1 - alpha/2, na.rm = TRUE, type = 6)
+    lwr <- apply(mat, 1, stats::quantile, probs = alpha / 2, na.rm = TRUE, type = 6)
+    upr <- apply(mat, 1, stats::quantile, probs = 1 - alpha / 2, na.rm = TRUE, type = 6)
 
     # coverage guard + optional smoothing
     min_reps <- ceiling(R * min_rep_frac)
@@ -545,11 +591,14 @@ plot_alpha_diversity <- function(alpha_df,
     upr[coverage < min_reps] <- NA_real_
     if (isTRUE(smooth_ci)) {
       smooth_vec <- function(y) {
-        pred <- try(stats::predict(stats::loess(y ~ seq_along(y), span = 0.25,
-                                                na.action = stats::na.exclude)), silent = TRUE)
+        pred <- try(stats::predict(stats::loess(y ~ seq_along(y),
+          span = 0.25,
+          na.action = stats::na.exclude
+        )), silent = TRUE)
         if (inherits(pred, "try-error")) y else as.numeric(pred)
       }
-      lwr <- smooth_vec(lwr); upr <- smooth_vec(upr)
+      lwr <- smooth_vec(lwr)
+      upr <- smooth_vec(upr)
     }
     if (isTRUE(nonneg)) lwr <- pmax(lwr, 0)
 
@@ -560,40 +609,47 @@ plot_alpha_diversity <- function(alpha_df,
   .posterior_band <- function(d, xvar, yvar, k = 7, level = 0.95,
                               nonneg = FALSE, grid_n = 200) {
     if (!requireNamespace("mgcv", quietly = TRUE) ||
-        !requireNamespace("mvtnorm", quietly = TRUE)) {
+      !requireNamespace("mvtnorm", quietly = TRUE)) {
       stop("ci_method='posterior' requires 'mgcv' and 'mvtnorm'.")
     }
     x <- d[[xvar]]
     rng <- range(x, na.rm = TRUE)
     xgrid <- if (rng[1] == rng[2]) sort(unique(x)) else seq(rng[1], rng[2], length.out = grid_n)
 
-    n_ux  <- length(unique(x))
+    n_ux <- length(unique(x))
     k_eff <- max(3L, min(k, n_ux - 1L))
     if (!is.finite(k_eff) || k_eff < 3L) {
       fit0 <- stats::loess(stats::as.formula(paste(yvar, "~", xvar)), data = d, span = 0.75)
-      mu0  <- as.numeric(predict(fit0, newdata = .make_newdata(xvar, xgrid)))
-      res  <- d[[yvar]] - predict(fit0)
-      se   <- rep(stats::sd(res, na.rm = TRUE), length(xgrid))
-      z    <- stats::qnorm(1 - (1 - level)/2)
-      lwr  <- mu0 - z * se; upr <- mu0 + z * se
-      if (isTRUE(nonneg)) { mu0 <- pmax(mu0, 0); lwr <- pmax(lwr, 0) }
+      mu0 <- as.numeric(predict(fit0, newdata = .make_newdata(xvar, xgrid)))
+      res <- d[[yvar]] - predict(fit0)
+      se <- rep(stats::sd(res, na.rm = TRUE), length(xgrid))
+      z <- stats::qnorm(1 - (1 - level) / 2)
+      lwr <- mu0 - z * se
+      upr <- mu0 + z * se
+      if (isTRUE(nonneg)) {
+        mu0 <- pmax(mu0, 0)
+        lwr <- pmax(lwr, 0)
+      }
       return(tibble::tibble(.x = xgrid, .y = mu0, lwr = lwr, upr = upr))
     }
 
     form <- stats::as.formula(paste(yvar, "~ s(", xvar, ", k = ", k_eff, ")", sep = ""))
-    fit  <- mgcv::gam(form, data = d)
-    nd   <- .make_newdata(xvar, xgrid)
-    Xp   <- mgcv::predict.gam(fit, newdata = nd, type = "lpmatrix")
+    fit <- mgcv::gam(form, data = d)
+    nd <- .make_newdata(xvar, xgrid)
+    Xp <- mgcv::predict.gam(fit, newdata = nd, type = "lpmatrix")
     beta <- stats::coef(fit)
-    Vb   <- fit$Vp
-    R    <- 2000L
-    B    <- mvtnorm::rmvnorm(R, mean = beta, sigma = Vb)
-    Y    <- Xp %*% t(B)
-    mu0  <- as.numeric(Xp %*% beta)
+    Vb <- fit$Vp
+    R <- 2000L
+    B <- mvtnorm::rmvnorm(R, mean = beta, sigma = Vb)
+    Y <- Xp %*% t(B)
+    mu0 <- as.numeric(Xp %*% beta)
     alpha <- 1 - level
-    lwr  <- apply(Y, 1, stats::quantile, probs = alpha/2,     type = 6)
-    upr  <- apply(Y, 1, stats::quantile, probs = 1 - alpha/2, type = 6)
-    if (isTRUE(nonneg)) { mu0 <- pmax(mu0, 0); lwr <- pmax(lwr, 0) }
+    lwr <- apply(Y, 1, stats::quantile, probs = alpha / 2, type = 6)
+    upr <- apply(Y, 1, stats::quantile, probs = 1 - alpha / 2, type = 6)
+    if (isTRUE(nonneg)) {
+      mu0 <- pmax(mu0, 0)
+      lwr <- pmax(lwr, 0)
+    }
     tibble::tibble(.x = xgrid, .y = mu0, lwr = lwr, upr = upr)
   }
 
@@ -601,7 +657,7 @@ plot_alpha_diversity <- function(alpha_df,
   if (!is.null(time_col) && time_col %in% names(df)) {
     tsym <- rlang::sym(time_col)
     tvec <- df[[time_col]]
-    is_cont <- is.numeric(tvec) || inherits(tvec, c("Date","POSIXct","POSIXt"))
+    is_cont <- is.numeric(tvec) || inherits(tvec, c("Date", "POSIXct", "POSIXt"))
 
     # clean rows
     df <- df[stats::complete.cases(df[, c(group_col, metric_col, time_col), drop = FALSE]), , drop = FALSE]
@@ -612,28 +668,39 @@ plot_alpha_diversity <- function(alpha_df,
       if (!is.null(rsym) && facet_by_rank) group_vars <- c(group_vars, list(rsym))
       sum_df <- df |>
         dplyr::group_by(!!!group_vars) |>
-        dplyr::summarise(mean = mean(!!msym, na.rm = TRUE),
-                         sd   = stats::sd(!!msym, na.rm = TRUE),
-                         n    = dplyr::n(), .groups = "drop") |>
+        dplyr::summarise(
+          mean = mean(!!msym, na.rm = TRUE),
+          sd = stats::sd(!!msym, na.rm = TRUE),
+          n = dplyr::n(), .groups = "drop"
+        ) |>
         dplyr::mutate(sd = dplyr::coalesce(sd, 0))
 
-      p <- ggplot2::ggplot(sum_df,
-                           ggplot2::aes(x = !!tsym, y = .data$mean, group = !!gsym, color = !!gsym)) +
+      p <- ggplot2::ggplot(
+        sum_df,
+        ggplot2::aes(x = !!tsym, y = .data$mean, group = !!gsym, color = !!gsym)
+      ) +
         ggplot2::geom_line(alpha = 0.9) +
         ggplot2::geom_point(size = 2) +
-        ggplot2::geom_errorbar(ggplot2::aes(ymin = pmax(.data$mean - .data$sd, 0),
-                                            ymax = .data$mean + .data$sd),
-                               width = 0.15, alpha = 0.7) +
+        ggplot2::geom_errorbar(
+          ggplot2::aes(
+            ymin = pmax(.data$mean - .data$sd, 0),
+            ymax = .data$mean + .data$sd
+          ),
+          width = 0.15, alpha = 0.7
+        ) +
         ggplot2::labs(x = time_col, y = ylab, color = group_col, fill = group_col) +
         ggplot2::theme_bw(base_size = 13) +
-        ggplot2::theme(panel.grid = ggplot2::element_blank(),
-                       axis.text.x = ggplot2::element_text(angle = 45, vjust = 0.6, hjust = 0.5))
-      p <- add_color_scales(p); p <- add_facets(p); return(p)
+        ggplot2::theme(
+          panel.grid = ggplot2::element_blank(),
+          axis.text.x = ggplot2::element_text(angle = 45, vjust = 0.6, hjust = 0.5)
+        )
+      p <- add_color_scales(p)
+      p <- add_facets(p)
+      return(p)
     }
 
     # ---- continuous time ----
     if (continuous_mode == "gam") {
-
       if (ci_method == "model") {
         # model-based (geom_smooth) — ggplot groups by color automatically
         group_keys <- list(gsym)
@@ -651,23 +718,29 @@ plot_alpha_diversity <- function(alpha_df,
             ggplot2::labs(x = time_col, y = ylab, color = group_col) +
             ggplot2::theme_bw(base_size = 13) +
             ggplot2::theme(panel.grid = ggplot2::element_blank())
-          p <- add_color_scales(p); p <- add_facets(p); return(p)
+          p <- add_color_scales(p)
+          p <- add_facets(p)
+          return(p)
         }
         p <- ggplot2::ggplot(df, ggplot2::aes(x = !!tsym, y = !!msym, color = !!gsym)) +
           ggplot2::geom_point(alpha = point_alpha, size = 1) +
-          ggplot2::geom_smooth(method  = "gam",
-                               formula = y ~ s(x, k = k_safe),
-                               se      = gam_se,
-                               level   = ci_level) +
+          ggplot2::geom_smooth(
+            method = "gam",
+            formula = y ~ s(x, k = k_safe),
+            se = gam_se,
+            level = ci_level
+          ) +
           ggplot2::labs(x = time_col, y = ylab, color = group_col) +
           ggplot2::theme_bw(base_size = 13) +
           ggplot2::theme(panel.grid = ggplot2::element_blank())
-        p <- add_color_scales(p); p <- add_facets(p); return(p)
+        p <- add_color_scales(p)
+        p <- add_facets(p)
+        return(p)
       }
 
       if (ci_method == "posterior") {
         if (!requireNamespace("mgcv", quietly = TRUE) ||
-            !requireNamespace("mvtnorm", quietly = TRUE)) {
+          !requireNamespace("mvtnorm", quietly = TRUE)) {
           stop("ci_method='posterior' requires 'mgcv' and 'mvtnorm'.")
         }
         split_keys <- c(group_col, if (!is.null(rsym) && facet_by_rank) rank_col else NULL)
@@ -679,39 +752,52 @@ plot_alpha_diversity <- function(alpha_df,
           dsub <- as.data.frame(dsub)
           gval <- unique(dsub[[group_col]])
           rval <- if (!is.null(rsym) && facet_by_rank) unique(dsub[[rank_col]]) else NA
-          out  <- .posterior_band(dsub, xvar = time_col, yvar = metric_col,
-                                  k = gam_k, level = ci_level,
-                                  nonneg = enforce_nonneg,
-                                  grid_n = posterior_grid_n)
+          out <- .posterior_band(dsub,
+            xvar = time_col, yvar = metric_col,
+            k = gam_k, level = ci_level,
+            nonneg = enforce_nonneg,
+            grid_n = posterior_grid_n
+          )
           out[[group_col]] <- gval
           if (!is.null(rsym) && facet_by_rank) out[[rank_col]] <- rval
           out
         }) |>
           dplyr::mutate(
-            .grp = if (!is.null(rsym) && facet_by_rank)
+            .grp = if (!is.null(rsym) && facet_by_rank) {
               interaction(.data[[group_col]], .data[[rank_col]], drop = TRUE)
-            else
+            } else {
               .data[[group_col]]
+            }
           ) |>
           dplyr::arrange(.grp, .data$.x) |>
           tidyr::drop_na(lwr, upr)
 
         p <- ggplot2::ggplot() +
-          ggplot2::geom_point(data = df,
-                              ggplot2::aes(x = !!tsym, y = !!msym, color = !!gsym),
-                              alpha = point_alpha, size = 1) +
-          ggplot2::geom_ribbon(data = preds,
-                               ggplot2::aes(x = .data$.x, ymin = .data$lwr, ymax = .data$upr,
-                                            group = .data$.grp),
-                               fill = ci_fill, alpha = ci_alpha, colour = NA,
-                               inherit.aes = FALSE, na.rm = TRUE) +
-          ggplot2::geom_line(data = preds,
-                             ggplot2::aes(x = .data$.x, y = .data$.y, color = !!gsym, group = .data$.grp),
-                             linewidth = 1, na.rm = TRUE) +
+          ggplot2::geom_point(
+            data = df,
+            ggplot2::aes(x = !!tsym, y = !!msym, color = !!gsym),
+            alpha = point_alpha, size = 1
+          ) +
+          ggplot2::geom_ribbon(
+            data = preds,
+            ggplot2::aes(
+              x = .data$.x, ymin = .data$lwr, ymax = .data$upr,
+              group = .data$.grp
+            ),
+            fill = ci_fill, alpha = ci_alpha, colour = NA,
+            inherit.aes = FALSE, na.rm = TRUE
+          ) +
+          ggplot2::geom_line(
+            data = preds,
+            ggplot2::aes(x = .data$.x, y = .data$.y, color = !!gsym, group = .data$.grp),
+            linewidth = 1, na.rm = TRUE
+          ) +
           ggplot2::labs(x = time_col, y = ylab, color = group_col) +
           ggplot2::theme_bw(base_size = 13) +
           ggplot2::theme(panel.grid = ggplot2::element_blank())
-        p <- add_color_scales(p); p <- add_facets(p); return(p)
+        p <- add_color_scales(p)
+        p <- add_facets(p)
+        return(p)
       }
 
       # ci_method == "bootstrap"
@@ -726,52 +812,64 @@ plot_alpha_diversity <- function(alpha_df,
         dsub <- as.data.frame(dsub)
         gval <- unique(dsub[[group_col]])
         rval <- if (!is.null(rsym) && facet_by_rank) unique(dsub[[rank_col]]) else NA
-        out  <- .bootstrap_smoother(
-          dsub, xvar = time_col, yvar = metric_col,
+        out <- .bootstrap_smoother(
+          dsub,
+          xvar = time_col, yvar = metric_col,
           method = "gam", k = gam_k, R = boot_R,
           level = ci_level, seed = NULL,
           progress = boot_progress,
           nonneg = enforce_nonneg,
           sparse_fallback = boot_sparse_fallback,
-          min_rep_frac    = boot_min_rep_frac,
-          smooth_ci       = boot_smooth_ci
+          min_rep_frac = boot_min_rep_frac,
+          smooth_ci = boot_smooth_ci
         )
         out[[group_col]] <- gval
         if (!is.null(rsym) && facet_by_rank) out[[rank_col]] <- rval
         out
       }) |>
         dplyr::mutate(
-          .grp = if (!is.null(rsym) && facet_by_rank)
+          .grp = if (!is.null(rsym) && facet_by_rank) {
             interaction(.data[[group_col]], .data[[rank_col]], drop = TRUE)
-          else
+          } else {
             .data[[group_col]]
+          }
         ) |>
         dplyr::arrange(.grp, .data$.x) |>
         tidyr::drop_na(lwr, upr)
 
       p <- ggplot2::ggplot() +
-        ggplot2::geom_point(data = df,
-                            ggplot2::aes(x = !!tsym, y = !!msym, color = !!gsym),
-                            alpha = point_alpha, size = 1) +
-        ggplot2::geom_ribbon(data = preds,
-                             ggplot2::aes(x = .data$.x, ymin = .data$lwr, ymax = .data$upr,
-                                          group = .data$.grp),
-                             fill = ci_fill, alpha = ci_alpha, colour = NA,
-                             inherit.aes = FALSE, na.rm = TRUE) +
-        ggplot2::geom_line(data = preds,
-                           ggplot2::aes(x = .data$.x, y = .data$.y, color = !!gsym, group = .data$.grp),
-                           linewidth = 1, na.rm = TRUE) +
+        ggplot2::geom_point(
+          data = df,
+          ggplot2::aes(x = !!tsym, y = !!msym, color = !!gsym),
+          alpha = point_alpha, size = 1
+        ) +
+        ggplot2::geom_ribbon(
+          data = preds,
+          ggplot2::aes(
+            x = .data$.x, ymin = .data$lwr, ymax = .data$upr,
+            group = .data$.grp
+          ),
+          fill = ci_fill, alpha = ci_alpha, colour = NA,
+          inherit.aes = FALSE, na.rm = TRUE
+        ) +
+        ggplot2::geom_line(
+          data = preds,
+          ggplot2::aes(x = .data$.x, y = .data$.y, color = !!gsym, group = .data$.grp),
+          linewidth = 1, na.rm = TRUE
+        ) +
         ggplot2::labs(x = time_col, y = ylab, color = group_col) +
         ggplot2::theme_bw(base_size = 13) +
         ggplot2::theme(panel.grid = ggplot2::element_blank())
-      p <- add_color_scales(p); p <- add_facets(p); return(p)
+      p <- add_color_scales(p)
+      p <- add_facets(p)
+      return(p)
     }
 
     if (continuous_mode == "binned") {
       rng <- range(df[[time_col]], na.rm = TRUE)
       if (is.null(binwidth)) binwidth <- (rng[2] - rng[1]) / nbins
       make_bins <- function(x, width, xmin) floor((x - xmin) / width)
-      df$.bin     <- make_bins(df[[time_col]], binwidth, rng[1])
+      df$.bin <- make_bins(df[[time_col]], binwidth, rng[1])
       df$.bin_mid <- rng[1] + (df$.bin + 0.5) * binwidth
 
       group_vars <- list(gsym, rlang::sym(".bin"), rlang::sym(".bin_mid"))
@@ -782,18 +880,20 @@ plot_alpha_diversity <- function(alpha_df,
       sdat <- df |>
         dplyr::group_by(!!!group_vars) |>
         dplyr::summarise(
-          y  = sum_fun(!!msym, na.rm = TRUE),
+          y = sum_fun(!!msym, na.rm = TRUE),
           sd = stats::sd(!!msym, na.rm = TRUE),
-          n  = dplyr::n(),
+          n = dplyr::n(),
           .groups = "drop"
         )
 
       if (ci_method == "model") {
-        z <- stats::qnorm(1 - (1 - ci_level)/2)
+        z <- stats::qnorm(1 - (1 - ci_level) / 2)
         sdat <- sdat |>
-          dplyr::mutate(se = sd / sqrt(pmax(n, 1)),
-                        lwr = y - z * se,
-                        upr = y + z * se)
+          dplyr::mutate(
+            se = sd / sqrt(pmax(n, 1)),
+            lwr = y - z * se,
+            upr = y + z * se
+          )
       } else {
         set.seed(boot_seed)
         split_keys <- c(group_col, if (!is.null(rsym) && facet_by_rank) rank_col else NULL, ".bin", ".bin_mid")
@@ -801,11 +901,14 @@ plot_alpha_diversity <- function(alpha_df,
           dplyr::group_by(dplyr::across(dplyr::all_of(split_keys))) |>
           dplyr::summarise(vals = list(!!msym), .groups = "drop")
         .boot_bin <- function(vals) {
-          n <- length(vals); if (!n) return(c(NA_real_, NA_real_))
+          n <- length(vals)
+          if (!n) {
+            return(c(NA_real_, NA_real_))
+          }
           fun <- if (stat == "mean") mean else stats::median
           boots <- replicate(boot_R, fun(sample(vals, n, replace = TRUE)))
           alpha <- 1 - ci_level
-          stats::quantile(boots, probs = c(alpha/2, 1 - alpha/2), na.rm = TRUE, names = FALSE, type = 6)
+          stats::quantile(boots, probs = c(alpha / 2, 1 - alpha / 2), na.rm = TRUE, names = FALSE, type = 6)
         }
         boots <- df_split |>
           dplyr::mutate(ci = purrr::map(vals, .boot_bin)) |>
@@ -824,25 +927,31 @@ plot_alpha_diversity <- function(alpha_df,
       # per-cohort polygon grouping for ribbons
       sdat <- sdat |>
         dplyr::mutate(
-          .grp = if (!is.null(rsym) && facet_by_rank)
+          .grp = if (!is.null(rsym) && facet_by_rank) {
             interaction(.data[[group_col]], .data[[rank_col]], drop = TRUE)
-          else
+          } else {
             .data[[group_col]]
+          }
         ) |>
         dplyr::arrange(.grp, .data$.bin_mid) |>
         tidyr::drop_na(lwr, upr)
 
-      p <- ggplot2::ggplot(sdat, ggplot2::aes(x = .data$.bin_mid, y = .data$y,
-                                              color = !!gsym, group = .grp)) +
+      p <- ggplot2::ggplot(sdat, ggplot2::aes(
+        x = .data$.bin_mid, y = .data$y,
+        color = !!gsym, group = .grp
+      )) +
         ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$lwr, ymax = .data$upr, group = .grp),
-                             inherit.aes = FALSE, fill = ci_fill, alpha = ci_alpha,
-                             colour = NA, na.rm = TRUE) +
+          inherit.aes = FALSE, fill = ci_fill, alpha = ci_alpha,
+          colour = NA, na.rm = TRUE
+        ) +
         ggplot2::geom_line(size = 1, na.rm = TRUE) +
         ggplot2::geom_point(size = 1.5, na.rm = TRUE) +
         ggplot2::labs(x = time_col, y = ylab, color = group_col) +
         ggplot2::theme_bw(base_size = 13) +
         ggplot2::theme(panel.grid = ggplot2::element_blank())
-      p <- add_color_scales(p); p <- add_facets(p); return(p)
+      p <- add_color_scales(p)
+      p <- add_facets(p)
+      return(p)
     }
 
     # LOESS (plain)
@@ -852,7 +961,9 @@ plot_alpha_diversity <- function(alpha_df,
       ggplot2::labs(x = time_col, y = ylab, color = group_col) +
       ggplot2::theme_bw(base_size = 13) +
       ggplot2::theme(panel.grid = ggplot2::element_blank())
-    p <- add_color_scales(p); p <- add_facets(p); return(p)
+    p <- add_color_scales(p)
+    p <- add_facets(p)
+    return(p)
   }
 
   # ---------- cross-sectional mode ----------
