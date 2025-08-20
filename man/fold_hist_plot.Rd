@@ -29,5 +29,5 @@ colouring/filling, sampling, and remote‑table friendliness.
 }
 \examples{
 fold_hist_plot(pd, by = "big_group", prop = 0.1, bins = 100) +
-  facet_wrap(~ big_group, nrow = 2)
+  facet_wrap(~big_group, nrow = 2)
 }

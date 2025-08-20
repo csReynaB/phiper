@@ -38,6 +38,6 @@ that produces a ready‑to‑modify Q–Q plot of the \emph{fold_change} column 
 }
 \examples{
 fold_qq_plot(pd, by = c("big_group", "timepoint"), prop = 0.1) +
-  facet_wrap(~ big_group, nrow = 2) +
+  facet_wrap(~big_group, nrow = 2) +
   ggpubr::theme_pubr()
 }
