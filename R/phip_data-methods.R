@@ -357,42 +357,46 @@ merge.phip_data <- function(x, y,
 #' @return A `phip_data` object with updated `data_long`.
 #'
 #' @importFrom dplyr left_join right_join inner_join full_join semi_join anti_join
-NULL
-
 # helpers (internal)
 .extract_data_long <- function(y) if (inherits(y, "phip_data")) y$data_long else y
 
-#' @exportS3Method left_join phip_data
+#' @export
+#' @method left_join phip_data
 left_join.phip_data <- function(x, y, ...) {
   y <- .extract_data_long(y)
   .modify_pd(x, dplyr::left_join(x$data_long, y, ...))
 }
 
-#' @exportS3Method right_join phip_data
+#' @export
+#' @method right_join phip_data
 right_join.phip_data <- function(x, y, ...) {
   y <- .extract_data_long(y)
   .modify_pd(x, dplyr::right_join(x$data_long, y, ...))
 }
 
-#' @exportS3Method inner_join phip_data
+#' @export
+#' @method inner_join phip_data
 inner_join.phip_data <- function(x, y, ...) {
   y <- .extract_data_long(y)
   .modify_pd(x, dplyr::inner_join(x$data_long, y, ...))
 }
 
-#' @exportS3Method full_join phip_data
+#' @export
+#' @method full_join phip_data
 full_join.phip_data <- function(x, y, ...) {
   y <- .extract_data_long(y)
   .modify_pd(x, dplyr::full_join(x$data_long, y, ...))
 }
 
-#' @exportS3Method semi_join phip_data
+#' @export
+#' @method semi_join phip_data
 semi_join.phip_data <- function(x, y, ...) {
   y <- .extract_data_long(y)
   .modify_pd(x, dplyr::semi_join(x$data_long, y, ...))
 }
 
-#' @exportS3Method anti_join phip_data
+#' @export
+#' @method anti_join phip_data
 anti_join.phip_data <- function(x, y, ...) {
   y <- .extract_data_long(y)
   .modify_pd(x, dplyr::anti_join(x$data_long, y, ...))
