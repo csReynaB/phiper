@@ -345,38 +345,57 @@ merge.phip_data <- function(x, y,
   .modify_pd(x, merged_tbl)
 }
 
-# Thin dplyr-style wrappers ------------------------------------------------
-# Allow users to write left_join(pd1, pd2, ...) just like in regular dplyr.
-
+#' dplyr joins for `phip_data`
+#'
+#' Cienkie wrappery: stosują `dplyr::<join>` do `x$data_long`
+#' po uprzednim rozwinięciu `y` (jeśli to `phip_data`), a wynik
+#' zawijają z powrotem przez `.modify_pd()`.
+#'
+#' @param x A `phip_data` object.
+#' @param y A `phip_data` or a data frame / tbl.
+#' @param ... Passed to the corresponding `dplyr::<join>` function.
+#' @return A `phip_data` object with updated `data_long`.
+#'
 #' @importFrom dplyr left_join right_join inner_join full_join semi_join anti_join
-joins <- c(
-  "left_join", "right_join", "inner_join",
-  "full_join", "semi_join", "anti_join"
-)
+NULL
 
-for (join in joins) {
-  ## build the method name, e.g. "left_join.phip_data"
-  method_name <- paste0(join, ".phip_data")
+# helpers (internal)
+.extract_data_long <- function(y) if (inherits(y, "phip_data")) y$data_long else y
 
-  ## create the function, capturing the current `join` value
-  fn <- eval(substitute(
-    function(x, y, ...) {
-      y <- .extract_data_long(y)
-      join_fun <- getExportedValue("dplyr", JOIN) # <— fetch from dplyr
-      .modify_pd(x, join_fun(x$data_long, y, ...))
-    },
-    list(JOIN = join)
-  ))
+#' @exportS3Method left_join phip_data
+left_join.phip_data <- function(x, y, ...) {
+  y <- .extract_data_long(y)
+  .modify_pd(x, dplyr::left_join(x$data_long, y, ...))
+}
 
-  ## assign it into the package (or global) environment
-  assign(method_name, fn, envir = parent.frame())
+#' @exportS3Method right_join phip_data
+right_join.phip_data <- function(x, y, ...) {
+  y <- .extract_data_long(y)
+  .modify_pd(x, dplyr::right_join(x$data_long, y, ...))
+}
 
-  ## make sure the S3 method is registered when the package is loaded
-  if (exists("registerS3method", mode = "function")) {
-    registerS3method(join, "phip_data", fn,
-      envir = asNamespace(utils::packageName())
-    )
-  }
+#' @exportS3Method inner_join phip_data
+inner_join.phip_data <- function(x, y, ...) {
+  y <- .extract_data_long(y)
+  .modify_pd(x, dplyr::inner_join(x$data_long, y, ...))
+}
+
+#' @exportS3Method full_join phip_data
+full_join.phip_data <- function(x, y, ...) {
+  y <- .extract_data_long(y)
+  .modify_pd(x, dplyr::full_join(x$data_long, y, ...))
+}
+
+#' @exportS3Method semi_join phip_data
+semi_join.phip_data <- function(x, y, ...) {
+  y <- .extract_data_long(y)
+  .modify_pd(x, dplyr::semi_join(x$data_long, y, ...))
+}
+
+#' @exportS3Method anti_join phip_data
+anti_join.phip_data <- function(x, y, ...) {
+  y <- .extract_data_long(y)
+  .modify_pd(x, dplyr::anti_join(x$data_long, y, ...))
 }
 
 ###############################################################################
