@@ -86,14 +86,21 @@
   )
 
   ## 0. open a DuckDB connection -------------------------------------------
+  ## keep it persistent only for this R session, but ON DISK (so it can spill)
   cache_dir <- withr::local_tempdir("phiper_cache", .local_envir = globalenv())
-
   duckdb_file <- file.path(cache_dir, "phip_cache.duckdb")
+  tmp_dir <- file.path(cache_dir, "tmp")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
 
-  ## set the number of threads
-  con <- DBI::dbConnect(duckdb::duckdb(),
+  ## set threads + enable spilling via memory_limit & temp_directory
+  con <- DBI::dbConnect(
+    duckdb::duckdb(),
     dbdir = duckdb_file,
-    config = list(threads = as.character(cfg$n_cores))
+    config = list(
+      threads        = as.character(cfg$n_cores),
+      memory_limit   = cfg$duckdb_mem %||% "32GB",
+      temp_directory = tmp_dir
+    )
   )
 
   ## -- 1. Determine files to load ---------------------------------------------
@@ -109,14 +116,14 @@
 
   stopifnot(length(files) > 0)
 
-  ## -- 2. Helper: load a single file into a TEMP TABLE ------------------------
+  ## -- 2. Helper: load a single file into a (disk-backed) TABLE ---------------
   load_file <- function(path, tbl_name) {
-    path_q <- gsub("'", "''", path) # escape single quotes
+    path_q <- gsub("'", "''", path)
     if (grepl("\\.csv$", path, ignore.case = TRUE)) {
       DBI::dbExecute(
         con,
         sprintf(
-          "CREATE TEMP TABLE %s AS
+          "CREATE TABLE %s AS
              SELECT * FROM read_csv_auto('%s', HEADER=TRUE);",
           tbl_name, path_q
         )
@@ -125,7 +132,7 @@
       DBI::dbExecute(
         con,
         sprintf(
-          "CREATE TEMP TABLE %s AS
+          "CREATE TABLE %s AS
              SELECT * FROM parquet_scan('%s');",
           tbl_name, path_q
         )
@@ -134,7 +141,7 @@
   }
 
   tbl_names <- sprintf("f_%d", seq_along(files))
-  Map(load_file, files, tbl_names) # load every file
+  Map(load_file, files, tbl_names)
 
   ## -- 3. UNION ALL --> raw_combined ------------------------------------------
   union_sql <- paste(

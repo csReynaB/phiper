@@ -10,10 +10,10 @@
 #' @param data_long_path Character scalar. File or directory containing the
 #'   *long-format* PhIP-Seq data. Allowed extensions are **`.csv`** and
 #'   **`.parquet`**. Directories are treated as partitions of a parquet set.
-#' @param sample_id,peptide_id,subject_id,timepoint,present,fold_change,counts_input,counts_hit
+#' @param sample_id,peptide_id,subject_id,timepoint,exist,fold_change,counts_input,counts_hit
 #' Optional character strings. Supply these only if your column names differ
 #' from the defaults (`"sample_id"`, `"peptide_id"`, `"subject_id"`,
-#' `"timepoint"`, `"present"`, `"fold_change"`, `"counts_input"`,
+#' `"timepoint"`, `"exist"`, `"fold_change"`, `"counts_input"`,
 #' `"counts_hit"`). Each argument should contain the *name* of the column in the
 #' incoming data; `NULL` lets the default stand.
 #'
@@ -37,7 +37,7 @@
 #'   combinations are generated:
 #'   * Columns that are constant within each `sample_id` (metadata) are copied
 #'     to the new rows.
-#'   * Non-recyclable measurement columns (`fold_change`, `present`,
+#'   * Non-recyclable measurement columns (`fold_change`, `exist`,
 #'     `counts_input`, `counts_hit`, etc.) are initialised to 0.
 #'   The expanded table replaces the original *in place*.
 #'
@@ -95,7 +95,7 @@ phip_convert <- function(
     peptide_id = NULL,
     subject_id = NULL,
     timepoint = NULL,
-    present = NULL,
+    exist = NULL,
     fold_change = NULL,
     counts_input = NULL,
     counts_hit = NULL,
@@ -174,7 +174,7 @@ phip_convert <- function(
     peptide_id   = peptide_id %||% "peptide_id",
     subject_id   = subject_id %||% "subject_id",
     timepoint    = timepoint %||% "timepoint",
-    present      = present %||% "present",
+    exist        = exist %||% "exist",
     fold_change  = fold_change %||% "fold_change",
     counts_input = counts_input %||% "counts_input",
     counts_hit   = counts_hit %||% "counts_hit"

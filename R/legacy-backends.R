@@ -100,7 +100,7 @@
   long_tbls <- list(
     tbl_counts = load_and_unpivot(
       cfg$exist_file, "counts_wide",
-      "counts_long", "present"
+      "counts_long", "exist"
     ),
     tbl_fc = load_and_unpivot(
       cfg$fold_change_file, "fold_change_wide",
@@ -246,7 +246,7 @@
 
   # ---------- 1.  read & pivot matrices --------------------------------------
   mats <- list(
-    counts      = .process_matrix(.read_or_null(cfg$exist_file), "present"),
+    counts      = .process_matrix(.read_or_null(cfg$exist_file), "exist"),
     fold_change = .process_matrix(.read_or_null(cfg$fold_change_file), "fold_change"),
     input       = .process_matrix(.read_or_null(cfg$input_file), "input_count"),
     hit         = .process_matrix(.read_or_null(cfg$hit_file), "hit_count")

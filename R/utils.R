@@ -139,23 +139,22 @@
                             bullets = NULL,
                             expr,
                             verbose = .ph_opt("verbose", TRUE)) {
-  t0 <- proc.time()[["elapsed"]] # register start
+  t0 <- Sys.time()
+  .ph_log_info(headline = headline, step = step, bullets = bullets, verbose = verbose)
 
-  # log infos with the logger
-  .ph_log_info(headline = headline,
-               step = step,
-               bullets = bullets,
-               verbose = verbose)
+  res <- tryCatch(
+    { force(expr) },  # evaluate user's code
+    finally = {
+      dt <- round(as.numeric(difftime(Sys.time(), t0, units = "secs")), 3)
+      .ph_log_ok(
+        headline = paste0(headline, " - done"),
+        step     = sprintf("elapsed: %ss", dt),
+        verbose  = verbose
+      )
+    }
+  )
 
-  # return elapsed time
-  on.exit({
-    dt <- round(proc.time()[["elapsed"]] - t0, 3)
-    .ph_log_ok(headline = paste0(headline, " - done"),
-               step = sprintf("elapsed: %ss", dt),
-               verbose = verbose)
-  }, add = TRUE)
-
-  force(expr)
+  res
 }
 
 # ==============================================================================
@@ -334,3 +333,68 @@ add_quotes <- function(x,
 
 # -- NULL-coalescing helper ----------------------------------------------------
 `%||%` <- function(x, y) if (!is.null(x)) x else y
+
+
+# ==============================================================================
+# database helpers
+# ==============================================================================
+# ensure peptide_library is queryable from the SAME connection as data_long
+.ensure_peplib_on_main <- function(x, schema_alias = "peplib") {
+  main_con <- dbplyr::remote_con(x$data_long)
+  pep_con  <- if (!is.null(x$meta$peptide_con)) {
+    x$meta$peptide_con
+  } else {
+    dbplyr::remote_con(x$peptide_library)
+  }
+
+  # try zero-copy ATTACH when both are DuckDB
+  if (inherits(main_con, "duckdb_connection") &&
+      inherits(pep_con, "duckdb_connection")) {
+    pep_db_path <- try(pep_con@driver@dbdir, silent = TRUE)
+    if (!inherits(pep_db_path, "try-error") &&
+        is.character(pep_db_path) &&
+        nzchar(pep_db_path)) {
+
+      # ATTACH (ignore "already attached")
+      try(DBI::dbExecute(main_con,
+                         sprintf("ATTACH '%s' AS %s;",
+                                 pep_db_path,
+                                 schema_alias)),
+          silent = TRUE)
+
+      # Detect base table name (fallback: "peptide_meta")
+      base_name <- tryCatch({
+        nm <- dbplyr::remote_name(x$peptide_library)
+        if (is.null(nm) || !nzchar(nm)) {
+          "peptide_meta"
+        } else {
+          sub("^.*\\.", "", nm)
+        }
+      }, error = function(e) "peptide_meta")
+
+      # Try both two-part and three-part references
+      try_tbl <- function(sql_expr) {
+        tryCatch(dplyr::tbl(main_con, dbplyr::sql(sql_expr)),
+                 error = function(e) NULL)
+      }
+
+      candidates <- c(
+        sprintf("SELECT * FROM %s.%s",      schema_alias, base_name),
+        sprintf("SELECT * FROM %s.main.%s", schema_alias, base_name)
+      )
+
+      for (q in candidates) {
+        out <- try_tbl(q)
+        if (!is.null(out)) return(out)
+      }
+      # If both fail, we’ll fall through to the copy_to() fallback below.
+    }
+  }
+
+  # Fallback: copy peptidelib into main_con as a TEMP table
+  peplib_local <- dplyr::collect(x$peptide_library)
+  tmp_name <- paste0("peptide_meta_tmp_", as.integer(Sys.time()))
+  dplyr::copy_to(main_con, peplib_local, tmp_name, temporary = TRUE,
+                 overwrite = TRUE)
+}
+

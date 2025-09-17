@@ -379,6 +379,76 @@ for (join in joins) {
   }
 }
 
+###############################################################################
+##  Pretty, CLI-styled yes/no prompt  --------------------------------------
+###############################################################################
+
+#' @title Ensure an existence flag (all ones) on `data_long`
+#'
+#' @description Appends/overwrites a column (default: "exist") filled with 1L on
+#'   the lazy `data_long` backend. Preserves laziness; no collection is forced.
+#'
+#' @param phip_data A <phip_data> object.
+#' @param exist_col Name of the existence column to append/overwrite.
+#' @param overwrite If FALSE and the column exists, abort with a phiper-style error.
+#' @return Modified <phip_data> with updated `data_long`.
+#' @examples
+#' \dontrun{
+#'   pd <- add_exist(pd)                  # adds "exist" := 1L
+#'   pd <- add_exist(pd, overwrite=TRUE)  # overwrites if present
+#' }
+#' @export add_exist
+add_exist <- function(phip_data,
+                                exist_col = "exist",
+                                overwrite = FALSE,
+                                ...) {
+  x <- phip_data
+  stopifnot(inherits(x, "phip_data"))
+  .data <- rlang::.data
+
+  .ph_with_timing(
+    headline = "Ensuring existence flag on data_long",
+    step     = sprintf("column: %s; overwrite: %s",
+                       add_quotes(exist_col, 1L), as.character(overwrite)),
+    expr = {
+      tbl <- x$data_long
+
+      if (exist_col %in% colnames(tbl)) {
+        if (!isTRUE(overwrite)) {
+          .ph_abort(
+            headline = "Existence column already present.",
+            step     = "input validation",
+            bullets  = c(
+              sprintf("column: %s", add_quotes(exist_col, 2L)),
+              "set overwrite = TRUE to replace existing values"
+            )
+          )
+        } else {
+          .ph_warn(
+            headline = "Overwriting existing existence flag.",
+            step     = "adding existence indicator",
+            bullets  = sprintf("column: %s", add_quotes(exist_col, 2L))
+          )
+        }
+      } else {
+        .ph_log_info(
+          "Adding existence flag column",
+          bullets = sprintf("column: %s", add_quotes(exist_col, 2L))
+        )
+      }
+
+      # lazy mutate; stays in DuckDB/Arrow without materialising
+      tbl_new <- dplyr::mutate(tbl, !!rlang::sym(exist_col) := 1L)
+
+      x_new <- .modify_pd(x, tbl_new)
+      # mark availability of an existence flag; don't touch full_cross/prop here
+      x_new$meta$exist <- TRUE
+      x_new
+    },
+    verbose = .ph_opt("verbose", TRUE)
+  )
+}
+
 ################################################################################
 ## helper to close duckdb connection -------------------------------
 ################################################################################
