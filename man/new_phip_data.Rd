@@ -36,12 +36,12 @@ the missing combinations.
 \itemize{
 \item Columns that are constant within a \code{sample_id} (metadata) are duplicated
 to the newly created rows.
-\item Measurement columns such as \code{fold_change}, \code{present}, raw counts, or any
-other non‑recyclable fields are initialised to 0.
+\item Measurement columns such as \code{fold_change}, \code{exist}, raw counts, or any
+other non-recyclable fields are initialised to 0.
 The expanded table replaces \code{data_long} in place.
 }}
 
-\item{materialise_table}{Logical (DuckDB and Arrow back‑ends only).
+\item{materialise_table}{Logical (DuckDB and Arrow back-ends only).
 If \code{FALSE} (default) the result is registered as a \strong{view}.
 If \code{TRUE} the result is fully \strong{materialised} and stored as a physical
 table, which speeds up repeated queries at the cost of extra memory/disk.}

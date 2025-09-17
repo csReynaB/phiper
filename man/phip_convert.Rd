@@ -10,7 +10,7 @@ phip_convert(
   peptide_id = NULL,
   subject_id = NULL,
   timepoint = NULL,
-  present = NULL,
+  exist = NULL,
   fold_change = NULL,
   counts_input = NULL,
   counts_hit = NULL,
@@ -26,9 +26,9 @@ phip_convert(
 \emph{long-format} PhIP-Seq data. Allowed extensions are \strong{\code{.csv}} and
 \strong{\code{.parquet}}. Directories are treated as partitions of a parquet set.}
 
-\item{sample_id, peptide_id, subject_id, timepoint, present, fold_change, counts_input, counts_hit}{Optional character strings. Supply these only if your column names differ
+\item{sample_id, peptide_id, subject_id, timepoint, exist, fold_change, counts_input, counts_hit}{Optional character strings. Supply these only if your column names differ
 from the defaults (\code{"sample_id"}, \code{"peptide_id"}, \code{"subject_id"},
-\code{"timepoint"}, \code{"present"}, \code{"fold_change"}, \code{"counts_input"},
+\code{"timepoint"}, \code{"exist"}, \code{"fold_change"}, \code{"counts_input"},
 \code{"counts_hit"}). Each argument should contain the \emph{name} of the column in the
 incoming data; \code{NULL} lets the default stand.}
 
@@ -55,7 +55,7 @@ combinations are generated:
 \itemize{
 \item Columns that are constant within each \code{sample_id} (metadata) are copied
 to the new rows.
-\item Non-recyclable measurement columns (\code{fold_change}, \code{present},
+\item Non-recyclable measurement columns (\code{fold_change}, \code{exist},
 \code{counts_input}, \code{counts_hit}, etc.) are initialised to 0.
 The expanded table replaces the original \emph{in place}.
 }}

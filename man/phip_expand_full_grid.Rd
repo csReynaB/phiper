@@ -5,7 +5,7 @@
 \alias{phip_expand_full_grid.data.frame}
 \alias{phip_expand_full_grid.tbl_lazy}
 \alias{phip_expand_full_grid.phip_data}
-\title{Expand to a full \verb{sample_id × peptide_id} grid}
+\title{Expand to a full \code{sample_id * peptide_id} grid}
 \usage{
 phip_expand_full_grid(x, ...)
 
@@ -40,45 +40,49 @@ phip_expand_full_grid(x, ...)
 )
 }
 \arguments{
-\item{x}{Input object: a data frame / tibble, a lazy \code{dbplyr} table, or a
-\verb{<phip_data>} object.}
+\item{x}{Input: data frame / tibble, lazy \code{dbplyr} table, or \verb{<phip_data>}.}
 
-\item{...}{Passed on to methods; currently unused.}
+\item{...}{Reserved for future extensions; currently unused.}
 
-\item{key_col}{Name of the sample identifier column. Default \code{"sample_id"}.}
+\item{key_col}{Name(s) of the sample identifier column(s). Character scalar
+or vector, e.g. \code{"sample_id"} or \code{c("subject_id", "timepoint_factor")}.}
 
 \item{id_col}{Name of the peptide identifier column. Default \code{"peptide_id"}.}
 
-\item{fill_override}{Optional named list of fill values for \strong{introduced} rows,
-e.g. \code{list(present = 0L, fold_change = NA_real_)}. Overrides the defaults.}
+\item{fill_override}{Optional named list of fill values for \strong{introduced}
+rows, e.g. \code{list(present = 0L, fold_change = NA_real_)}. User-provided
+entries take precedence over the defaults.}
+
+\item{add_exist}{If \code{TRUE}, add an integer existence flag (0/1) marking
+whether a row was present before the expansion.}
+
+\item{exist_col}{Name for the existence flag. If this column already exists,
+it will be \strong{overwritten}.}
 }
 \value{
 \itemize{
-\item data.frame/tbl_lazy methods: object of the same general kind (local or lazy).
-\item phip_data method: the updated \verb{<phip_data>} object (invisibly or visibly,
-depending on how you call it).
+\item \code{data.frame} / \code{tbl_lazy} methods: object of the same general kind.
+\item \verb{<phip_data>} method: the updated \verb{<phip_data>} object (returned).
 }
 }
 \description{
-Creates the full Cartesian product of samples and peptides and joins
-back per-sample metadata. For rows introduced by the expansion,
-numeric/integer cell-level columns are filled with \code{0} (and logicals
-with \code{FALSE}) unless overridden with \code{fill_override}.
+Create the full Cartesian product of samples and peptides and
+join back per-sample metadata. For rows introduced by the expansion,
+numeric/integer columns are filled with \code{0} and logical columns with
+\code{FALSE}, unless overridden via \code{fill_override}.
 }
 \details{
-Works with local data frames and lazy \code{dbplyr} tables. The \code{phip_data}
-method updates and returns the object (keeping laziness unless you
-later \code{compute()} / \code{collect()} or use \code{\link[=phip_register_tbl]{phip_register_tbl()}}).
-}
-\section{Method dispatch}{
+Works with in-memory data frames and lazy \code{dbplyr} tables. The
+\verb{<phip_data>} method updates \code{x$data_long} in place (preserving laziness
+unless you later \code{compute()} / \code{collect()} or use \code{\link[=phip_register_tbl]{phip_register_tbl()}}).
 
+Method dispatch:
 \itemize{
-\item \code{phip_expand_full_grid.data.frame()} – returns a (local) data frame/tibble.
-\item \code{phip_expand_full_grid.tbl_lazy()}   – returns a lazy table (still lazy).
-\item \code{phip_expand_full_grid.phip_data()}  – updates \code{x$data_long} and returns \code{x}.
+\item \code{phip_expand_full_grid.data.frame()} - returns a local tibble/data frame.
+\item \code{phip_expand_full_grid.tbl_lazy()}   - returns a lazy table (still lazy).
+\item \code{phip_expand_full_grid.phip_data()}  - updates \code{x$data_long} and returns \code{x}.
 }
 }
-
 \examples{
 \dontrun{
 # local tibble
@@ -92,8 +96,7 @@ dplyr::compute(df_lazy2, name = "data_long_full", temporary = TRUE)
 # <phip_data>: update in place & reassign
 pd <- phip_expand_full_grid(pd, fill_override = list(fold_change = NA_real_))
 }
-
 }
 \seealso{
-\code{\link[=phip_register_tbl]{phip_register_tbl()}}, \code{\link[=validate_phip_data]{validate_phip_data()}}
+\code{\link[=phip_register_tbl]{phip_register_tbl()}}
 }

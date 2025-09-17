@@ -2,7 +2,7 @@
 % Please edit documentation in R/phip_data-validator.R
 \name{phip_register_tbl}
 \alias{phip_register_tbl}
-\title{Register a lazy table back to the DB as a TABLE or VIEW}
+\title{Register a lazy table back to the database as a TABLE or VIEW}
 \usage{
 phip_register_tbl(
   tbl,
@@ -17,10 +17,10 @@ phip_register_tbl(
 
 \item{con}{A \code{DBI} connection.}
 
-\item{name}{Target name to create.}
+\item{name}{Target name to create (default \code{"data_long"}).}
 
-\item{materialise_table}{If \code{TRUE}, create a TABLE via \code{compute()}. If \code{FALSE},
-create a VIEW.}
+\item{materialise_table}{If \code{TRUE}, create a TABLE via \code{compute()}. If
+\code{FALSE}, create a VIEW.}
 
 \item{temporary}{If \code{TRUE}, create a TEMP table/view where supported.}
 }
@@ -28,14 +28,15 @@ create a VIEW.}
 A lazy \code{dplyr::tbl} referencing the new TABLE/VIEW.
 }
 \description{
-Convenience wrapper to either materialise a lazy pipeline via
-\code{dplyr::compute()} (TABLE) or emit a \verb{CREATE [TEMP] VIEW AS ...}
-for engines like DuckDB. Returns a \code{dplyr::tbl()} pointing to the
-created object.
+Convenience wrapper that either materialises a lazy pipeline via
+\code{dplyr::compute()} (creating a TABLE) or emits a \verb{CREATE [TEMP] VIEW AS ...} (creating a VIEW) for engines like DuckDB. Returns a \code{dplyr::tbl()}
+pointing to the created object.
 }
 \examples{
 \dontrun{
 lazy <- dplyr::tbl(con, "data_long") |> dplyr::filter(fold_change > 0)
-phip_register_tbl(lazy, con, name = "data_long_pos", materialise_table = TRUE)
+phip_register_tbl(lazy, con,
+name = "data_long_pos",
+ materialise_table = TRUE)
 }
 }
