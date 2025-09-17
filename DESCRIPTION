@@ -51,6 +51,7 @@ Imports:
     fs,
     ggh4x,
     knitr,
+    MASS,
     rlang,
     tibble,
     vegan
