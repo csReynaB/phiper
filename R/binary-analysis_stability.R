@@ -1237,7 +1237,7 @@ plot_similarity_heatmap <- function(sim_tbl,
   dedupe  <- match.arg(dedupe)
   .data   <- rlang::.data
 
-  # ---- schema detection (new vs legacy) --------------------------------------
+  # --- schema detection --------------------------------------------------------
   have <- tryCatch(colnames(sim_tbl), error = function(e) character(0))
   if (!length(have)) have <- tryCatch(dplyr::tbl_vars(sim_tbl), error = function(e) character(0))
 
@@ -1287,7 +1287,6 @@ plot_similarity_heatmap <- function(sim_tbl,
     )
     dyads <- "no"
   }
-
   if (dyads != "no" && cluster != "none") {
     .ph_warn(
       headline = "Clustering disabled to preserve dyad diagonal.",
@@ -1297,7 +1296,7 @@ plot_similarity_heatmap <- function(sim_tbl,
     cluster <- "none"
   }
 
-  # ---- resolve requested (group,time) combos ---------------------------------
+  # --- resolve requested (group,time) combos ----------------------------------
   ddistinct <- function(tbl, ...) dplyr::distinct(tbl, ..., .keep_all = FALSE)
 
   gt <- ddistinct(sim_tbl, .data$group_left,  .data$time_left)  |>
@@ -1342,27 +1341,13 @@ plot_similarity_heatmap <- function(sim_tbl,
   }
 
   if (pairing == "cross" && identical(left_time, right_time)) {
-    .ph_abort(
-      headline = "`pairing = 'cross'` requires two *different* timepoints.",
-      step     = "input validation",
-      bullets  = c(
-        sprintf("left : %s @ %s", left_group,  left_time),
-        sprintf("right: %s @ %s", right_group, right_time)
-      )
-    )
+    .ph_abort("`pairing = 'cross'` requires two different timepoints.", step = "input validation")
   }
   if (pairing == "same" && !identical(left_time, right_time)) {
-    .ph_abort(
-      headline = "`pairing = 'same'` requires the *same* timepoint on both sides.",
-      step     = "input validation",
-      bullets  = c(
-        sprintf("left : %s @ %s", left_group,  left_time),
-        sprintf("right: %s @ %s", right_group, right_time)
-      )
-    )
+    .ph_abort("`pairing = 'same'` requires the same timepoint on both sides.", step = "input validation")
   }
 
-  # ---- filter + normalize orientation ----------------------------------------
+  # --- filter + normalize orientation -----------------------------------------
   sub <- sim_tbl |>
     dplyr::filter(.data$pairing == pairing) |>
     dplyr::filter(
@@ -1373,15 +1358,7 @@ plot_similarity_heatmap <- function(sim_tbl,
     ) |>
     dplyr::collect()
 
-  .chk_cond(!nrow(sub),
-            "No rows match the requested (group × time) combinations and pairing.",
-            step = "data filter",
-            bullets = c(
-              sprintf("left:  %s @ %s", left_group,  left_time),
-              sprintf("right: %s @ %s", right_group, right_time),
-              sprintf("pairing: %s", pairing)
-            )
-  )
+  .chk_cond(!nrow(sub), "No rows match the requested combinations.", step = "data filter")
 
   swap <- !(sub$group_left == left_group & sub$time_left == left_time)
   df <- data.frame(
@@ -1397,7 +1374,7 @@ plot_similarity_heatmap <- function(sim_tbl,
     stringsAsFactors = FALSE
   )
 
-  # --- DEDUPE across dyads when dyads == "no" ---------------------------------
+  # --- optional dedupe when dyads == "no" -------------------------------------
   if (dyads == "no" && has_dy) {
     agg <- switch(dedupe,
                   mean   = function(z) mean(z, na.rm = TRUE),
@@ -1415,14 +1392,42 @@ plot_similarity_heatmap <- function(sim_tbl,
                         df$group_left[1],  df$time_left[1],
                         df$group_right[1], df$time_right[1])
 
-  # ---- DYAD-AWARE AXIS BUILD (only when dyads != "no") -----------------------
+  # --- helper: duplicate missing reversed pairs (in axis space) ----------------
+  symmetrize_pairs <- function(df_axis, same_case) {
+    if (!same_case) return(df_axis)
+    # work on character to avoid factor level traps
+    keys <- df_axis |>
+      dplyr::transmute(sl = as.character(subject_left),
+                       sr = as.character(subject_right))
+    swap <- df_axis |>
+      dplyr::transmute(sl = as.character(subject_right),
+                       sr = as.character(subject_left),
+                       similarity = similarity)
+    add <- dplyr::anti_join(swap, keys, by = c("sl" = "sl", "sr" = "sr"))
+    if (!nrow(add)) return(df_axis)
+    add <- add |>
+      dplyr::transmute(
+        subject_left  = factor(sl, levels = levels(df_axis$subject_left)),
+        subject_right = factor(sr, levels = levels(df_axis$subject_right)),
+        similarity    = similarity,
+        time_left     = df_axis$time_left[1],
+        group_left    = df_axis$group_left[1],
+        time_right    = df_axis$time_right[1],
+        group_right   = df_axis$group_right[1]
+      )
+    dplyr::bind_rows(df_axis, dplyr::select(add, colnames(df_axis)))
+  }
+
+  same_case <- (pairing == "same" &&
+                  identical(left_group, right_group) &&
+                  identical(left_time,  right_time))
+
+  # ======================= DYAD-AWARE BRANCH ===================================
   if (dyads != "no" && has_dy) {
     left_dy   <- unique(df$dyad_left[!is.na(df$dyad_left)])
     right_dy  <- unique(df$dyad_right[!is.na(df$dyad_right)])
     common_dy <- sort(intersect(left_dy, right_dy))
-    .chk_cond(!length(common_dy),
-              "No common dyad IDs between left and right selections.",
-              step = "dyad intersection")
+    .chk_cond(!length(common_dy), "No common dyad IDs.", step = "dyad intersection")
 
     if (dyads == "only") {
       df <- df[df$dyad_left %in% common_dy & df$dyad_right %in% common_dy &
@@ -1450,8 +1455,7 @@ plot_similarity_heatmap <- function(sim_tbl,
     for (d in common_dy) {
       nL <- length(Llist[[d]] %||% character(0))
       nR <- length(Rlist[[d]] %||% character(0))
-      K  <- max(nL, nR)
-      if (K == 0L) next
+      K  <- max(nL, nR); if (K == 0L) next
       Lmap <- .build_map(Llist[[d]], K); Lmap$dyad <- d
       Rmap <- .build_map(Rlist[[d]], K); Rmap$dyad <- d
       left_map[[d]]  <- Lmap
@@ -1474,19 +1478,14 @@ plot_similarity_heatmap <- function(sim_tbl,
     df$subject_left  <- factor(df$axis_left,  levels = y_levels)
     df$subject_right <- factor(df$axis_right, levels = x_levels)
 
+    # >>> symmetry BEFORE padding (duplicates missing reversed pairs)
+    df <- symmetrize_pairs(df, same_case)
+
     present <- dplyr::distinct(df, .data$subject_left, .data$subject_right)
     want_n  <- length(y_levels) * length(x_levels)
 
     if (grid == "require_full" && nrow(present) < want_n) {
-      .ph_abort(
-        headline = "Full correlation matrix required — data are incomplete after dyad padding.",
-        step = "matrix validation",
-        bullets = c(
-          sprintf("|L|=%d, |R|=%d, expected=%d, available=%d",
-                  length(y_levels), length(x_levels), want_n, nrow(present)),
-          "Recompute similarities with `subject_mode = 'all'` so all pairs exist."
-        )
-      )
+      .ph_abort("Full matrix required and data are incomplete after dyad padding.", step = "matrix validation")
     } else if (grid %in% c("union_pad","intersection")) {
       base <- df[1, c("time_left","group_left","time_right","group_right")]
       df <- tidyr::complete(df,
@@ -1497,12 +1496,11 @@ plot_similarity_heatmap <- function(sim_tbl,
           time_right = base$time_right, group_right = base$group_right
         )
     }
+    # ======================= NO-DYAD BRANCH ======================================
   } else {
-    # ---- No dyads: standard branch ------------------------------------------
     left_subs  <- sort(unique(df$subject_left))
     right_subs <- sort(unique(df$subject_right))
 
-    # optional clustering
     if (cluster != "none") {
       mat_df <- tidyr::pivot_wider(
         df, id_cols = .data$subject_left,
@@ -1522,7 +1520,6 @@ plot_similarity_heatmap <- function(sim_tbl,
       }
     }
 
-    # grid handling
     if (grid == "intersection") {
       common <- sort(intersect(left_subs, right_subs))
       df <- df[df$subject_left %in% common & df$subject_right %in% common, , drop = FALSE]
@@ -1533,19 +1530,14 @@ plot_similarity_heatmap <- function(sim_tbl,
     df$subject_left  <- factor(df$subject_left,  levels = left_subs)
     df$subject_right <- factor(df$subject_right, levels = right_subs)
 
+    # >>> symmetry BEFORE padding (duplicates missing reversed pairs)
+    df <- symmetrize_pairs(df, same_case)
+
     want_n <- length(left_subs) * length(right_subs)
     have_n <- nrow(dplyr::distinct(df, .data$subject_left, .data$subject_right))
 
     if (grid == "require_full" && have_n < want_n) {
-      .ph_abort(
-        headline = "Full correlation matrix required — data appear incomplete.",
-        step = "matrix validation",
-        bullets = c(
-          sprintf("|L|=%d, |R|=%d, expected=%d, available=%d",
-                  length(left_subs), length(right_subs), want_n, have_n),
-          "Recompute with `subject_mode = 'all'`."
-        )
-      )
+      .ph_abort("Full matrix required and data are incomplete.", step = "matrix validation")
     } else if (grid %in% c("union_pad","intersection")) {
       base <- df[1, c("time_left","group_left","time_right","group_right")]
       df <- tidyr::complete(df,
@@ -1556,12 +1548,12 @@ plot_similarity_heatmap <- function(sim_tbl,
           time_right = base$time_right, group_right = base$group_right
         )
       padded <- want_n - have_n
-      if (padded > 0L) .ph_log_info(sprintf("Grid=%s: padded %d missing tiles with NA.", grid, padded),
+      if (padded > 0L) .ph_log_info(sprintf("Grid=%s: padded %d tiles with NA.", grid, padded),
                                     step = "grid padding", verbose = verbose)
     }
   }
 
-  # ---- draw ------------------------------------------------------------------
+  # --- draw --------------------------------------------------------------------
   p <- ggplot2::ggplot(
     df,
     ggplot2::aes(x = .data$subject_right, y = .data$subject_left, fill = .data$similarity)
