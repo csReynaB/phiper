@@ -69,7 +69,7 @@ get_peptide_meta <- function(force_refresh = FALSE) {
         "combined_libraries_11.10.25.rds"
       )
       tmp <- tempfile(fileext = ".rds")
-      sha <- "b96411168c9c3c27d00ca45f1533cef56522d73c7d8d4a95caa3de1a5890d2d5 "
+      sha <- "d4ef4b3b066b4486968d9801d965e0ac0d85e26e0c24c80aab810422c11b4bdb"
 
       ## safe download (fallbacks if file changed, or if download does not
       ## succeed)
@@ -81,9 +81,9 @@ get_peptide_meta <- function(force_refresh = FALSE) {
       unlink(tmp)
       .ph_log_ok("Download complete and loaded into R")
 
-      # 4. capture rownames and clear them --> we want a separate column for the
-      # peptide_id
-      peptide_ids <- rownames(raw_meta) %||% rep(NA_character_, nrow(raw_meta))
+      # 4. peptide_id is now stored in the column withthe same name
+      peptide_ids <- raw_meta$peptide_id
+      raw_meta <- raw_meta[, -1]
       rownames(raw_meta) <- NULL
 
       # 5. sanitize each column
