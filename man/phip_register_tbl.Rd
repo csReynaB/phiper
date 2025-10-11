@@ -36,7 +36,8 @@ pointing to the created object.
 \dontrun{
 lazy <- dplyr::tbl(con, "data_long") |> dplyr::filter(fold_change > 0)
 phip_register_tbl(lazy, con,
-name = "data_long_pos",
- materialise_table = TRUE)
+  name = "data_long_pos",
+  materialise_table = TRUE
+)
 }
 }

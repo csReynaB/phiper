@@ -107,8 +107,8 @@ out <- compute_alpha_diversity(pd,
 
 # Use ranks present in the peptide library (e.g., lineage/taxa)
 out_taxa <- compute_alpha_diversity(pd,
-  group_cols = c("Cohort","timepoint"),
-  ranks = c("peptide_id","family","genus"),
+  group_cols = c("Cohort", "timepoint"),
+  ranks = c("peptide_id", "family", "genus"),
   group_interaction = TRUE
 )
 

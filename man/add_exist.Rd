@@ -22,7 +22,7 @@ the lazy \code{data_long} backend. Preserves laziness; no collection is forced.
 }
 \examples{
 \dontrun{
-  pd <- add_exist(pd)                  # adds "exist" := 1L
-  pd <- add_exist(pd, overwrite=TRUE)  # overwrites if present
+pd <- add_exist(pd) # adds "exist" := 1L
+pd <- add_exist(pd, overwrite = TRUE) # overwrites if present
 }
 }

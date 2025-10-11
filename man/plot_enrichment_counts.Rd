@@ -103,8 +103,10 @@ phiper-style error explaining which columns are missing.
 \examples{
 \dontrun{
 # phip_data input
-plot_enrichment_counts(pd, group_cols = "Cohort",
-                       prevalence_threshold = 0.05)
+plot_enrichment_counts(pd,
+  group_cols = "Cohort",
+  prevalence_threshold = 0.05
+)
 
 # no facets (aggregate over all samples)
 plot_enrichment_counts(pd, group_cols = NULL)
