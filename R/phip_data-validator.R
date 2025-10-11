@@ -4,15 +4,14 @@ validate_phip_data <- function(x,
                                na_warn_thresh = 0.50, # warn if >50% NA / zero
                                # optionally fill missing grid
                                auto_expand = TRUE) {
-  .check_pd(x)                # existing helper (assumes class & slots are sane)
-  .data <- rlang::.data       # to silence lintr / R CMD CHECK notes
+  .check_pd(x) # existing helper (assumes class & slots are sane)
+  .data <- rlang::.data # to silence lintr / R CMD CHECK notes
 
   # timing the whole command
   .ph_with_timing(
     headline = "Validating <phip_data>",
-    step     = "validate_phip_data()",
+    step = "validate_phip_data()",
     expr = {
-
       tbl <- x$data_long
       cols <- colnames(tbl)
 
@@ -42,8 +41,10 @@ validate_phip_data <- function(x,
       miss <- setdiff(need, cols)
       .chk_cond(
         length(miss) > 0,
-        sprintf("Missing mandatory column(s): %s",
-                paste(miss, collapse = ", ")),
+        sprintf(
+          "Missing mandatory column(s): %s",
+          paste(miss, collapse = ", ")
+        ),
         step = "structure"
       )
 
@@ -63,9 +64,9 @@ validate_phip_data <- function(x,
       .ph_log_info("Checking outcome family availability
                    (exist / fold_change / raw_counts)")
       have <- list(
-        exist    = "exist" %in% cols,
+        exist = "exist" %in% cols,
         fold_change = "fold_change" %in% cols,
-        raw_counts  = all(c("input_count", "hit_count") %in% cols)
+        raw_counts = all(c("input_count", "hit_count") %in% cols)
       )
       k <- sum(unlist(have))
       .chk_cond(
@@ -77,12 +78,15 @@ validate_phip_data <- function(x,
       ## -------------------------------------- 3  RESERVED-NAME COLLISIONS ----
       # reserved names defined at the beginning
       .ph_log_info("Checking collisions with reserved names",
-                   bullets = paste(reserved, collapse = ", "))
+        bullets = paste(reserved, collapse = ", ")
+      )
       overlap <- intersect(x$meta$extra_cols, reserved)
       .chk_cond(
         length(overlap) > 0,
-        sprintf("extra_cols overlap with reserved names: %s",
-                paste(overlap, collapse = ", ")),
+        sprintf(
+          "extra_cols overlap with reserved names: %s",
+          paste(overlap, collapse = ", ")
+        ),
         step = "reserved names"
       )
 
@@ -101,8 +105,10 @@ validate_phip_data <- function(x,
       bad_atomic <- names(sample0)[vapply(sample0, is.list, logical(1))]
       .chk_cond(
         length(bad_atomic) > 0,
-        sprintf("Non-atomic (list) columns found: %s",
-                paste(bad_atomic, collapse = ", ")),
+        sprintf(
+          "Non-atomic (list) columns found: %s",
+          paste(bad_atomic, collapse = ", ")
+        ),
         step = "atomicity"
       )
 
@@ -148,7 +154,8 @@ validate_phip_data <- function(x,
           utils::head(1) |>
           dplyr::collect()
         .chk_cond(nrow(bad) > 0, "`exist` must be 0/1/NA.",
-                  step = "value ranges: exist")
+          step = "value ranges: exist"
+        )
       }
 
       if (have$fold_change) {
@@ -158,7 +165,8 @@ validate_phip_data <- function(x,
           dplyr::summarise(all_finite = all(is.finite(.data$fold_change))) |>
           dplyr::pull(.data$all_finite)
         .chk_cond(!ok, "`fold_change` contains Inf/-Inf or NA.",
-                  step = "value ranges: fold_change")
+          step = "value ranges: fold_change"
+        )
       }
 
       if (have$raw_counts) {
@@ -167,13 +175,17 @@ validate_phip_data <- function(x,
           utils::head(1) |>
           dplyr::collect()
         .chk_cond(nrow(neg) > 0, "Raw counts must be non-negative.",
-                  step = "value ranges: raw_counts")
+          step = "value ranges: raw_counts"
+        )
       }
 
       ## ---------------------------------------------- 7  SPARSITY WARNING ----
       .ph_log_info("Assessing sparsity (NA/zero prevalence vs threshold)",
-                   bullets = sprintf("warn threshold: %.0f%%",
-                                     na_warn_thresh * 100))
+        bullets = sprintf(
+          "warn threshold: %.0f%%",
+          na_warn_thresh * 100
+        )
+      )
 
       if (have$exist) {
         prop_na <- tbl |>
@@ -195,7 +207,7 @@ validate_phip_data <- function(x,
         prop_zero <- tbl |>
           dplyr::summarise(
             p = sum(dplyr::if_else(.data$input_count == 0 &
-                                     .data$hit_count == 0, 1, 0)) / dplyr::n()
+              .data$hit_count == 0, 1, 0)) / dplyr::n()
           ) |>
           dplyr::pull(.data$p)
 
@@ -222,10 +234,12 @@ validate_phip_data <- function(x,
 
         .chk_cond(
           length(missing_in_lib) > 0,
-          sprintf("peptide_id not found in peptide_library (e.g. %s)",
-                  missing_in_lib[1]),
-          error = FALSE,  # emit warning instead of abort
-          step  = "peptide library coverage"
+          sprintf(
+            "peptide_id not found in peptide_library (e.g. %s)",
+            missing_in_lib[1]
+          ),
+          error = FALSE, # emit warning instead of abort
+          step = "peptide library coverage"
         )
       }
 
@@ -237,8 +251,10 @@ validate_phip_data <- function(x,
         extra_cmp <- setdiff(colnames(cmp), allowed_cmp_cols)
         .chk_cond(
           length(extra_cmp) > 0,
-          sprintf("Unexpected columns in comparisons: %s",
-                  paste(extra_cmp, collapse = ", ")),
+          sprintf(
+            "Unexpected columns in comparisons: %s",
+            paste(extra_cmp, collapse = ", ")
+          ),
           step = "comparisons: schema"
         )
 
@@ -246,12 +262,12 @@ validate_phip_data <- function(x,
           # which of the two exist? (timepoint / group)
           valid_cols <- dplyr::intersect(c("timepoint", "group"), colnames(tbl))
 
-          tbl |>                                  # keep only the existing ones
+          tbl |> # keep only the existing ones
             dplyr::select(dplyr::all_of(valid_cols)) |>
-            dplyr::distinct() |>                  # unique row-wise combinations
-            dplyr::collect() |>                   # pull the tiny result into R
-            unlist(use.names = FALSE) |>          # flatten to one vector
-            unique()                              # final de-dup
+            dplyr::distinct() |> # unique row-wise combinations
+            dplyr::collect() |> # pull the tiny result into R
+            unlist(use.names = FALSE) |> # flatten to one vector
+            unique() # final de-dup
         } else {
           tbl |>
             dplyr::distinct(.data$group) |>
@@ -265,8 +281,10 @@ validate_phip_data <- function(x,
 
         .chk_cond(
           length(bad_cmp) > 0,
-          sprintf("comparisons refer to unknown group labels (e.g. %s)",
-                  bad_cmp[1]),
+          sprintf(
+            "comparisons refer to unknown group labels (e.g. %s)",
+            bad_cmp[1]
+          ),
           step = "comparisons: labels"
         )
       }
@@ -287,8 +305,8 @@ validate_phip_data <- function(x,
       if (dplyr::pull(dims, .data$n_obs) != expect) {
         .ph_warn(
           headline = "Counts table is not a full peptide * sample grid.",
-          step     = "grid completeness",
-          bullets  = c(
+          step = "grid completeness",
+          bullets = c(
             sprintf("observed rows: %s", dplyr::pull(dims, .data$n_obs)),
             sprintf("expected rows: %s", expect)
           )
@@ -297,14 +315,15 @@ validate_phip_data <- function(x,
         if (isTRUE(auto_expand)) {
           .ph_log_info("Auto-expanding to full grid via
                        phip_expand_full_grid()",
-                       bullets = c("add_exist = TRUE", "exist_col = \"exist\""))
+            bullets = c("add_exist = TRUE", "exist_col = \"exist\"")
+          )
 
           tbl_expanded <- phip_expand_full_grid(
             tbl,
-            key_col    = "sample_id",
-            id_col     = "peptide_id",
-            add_exist  = TRUE,   # keep binary column
-            exist_col  = "exist",
+            key_col = "sample_id",
+            id_col = "peptide_id",
+            add_exist = TRUE, # keep binary column
+            exist_col = "exist",
             fill_override = list(
               exist        = 0L,
               fold_change  = 0,
@@ -318,8 +337,8 @@ validate_phip_data <- function(x,
           if (x$backend %in% c("duckdb", "arrow")) {
             x$data_long <- phip_register_tbl(
               tbl_expanded,
-              con   = x$meta$con,
-              name  = "data_long",
+              con = x$meta$con,
+              name = "data_long",
               materialise_table = x$meta$materialise_table
             )
           } else {
@@ -330,8 +349,8 @@ validate_phip_data <- function(x,
         } else {
           .ph_warn(
             headline = "Grid remains incomplete (auto_expand = FALSE).",
-            step     = "grid completeness",
-            bullets  = c(
+            step = "grid completeness",
+            bullets = c(
               sprintf("observed rows: %s", dplyr::pull(dims, .data$n_obs)),
               sprintf("expected rows: %s", expect)
             )
@@ -394,10 +413,14 @@ validate_phip_data <- function(x,
           headline = "Required columns are missing.",
           step = "input validation",
           bullets = c(
-            sprintf("missing: %s",
-                    paste(add_quotes(missing_cols, 2L), collapse = ", ")),
-            sprintf("available: %s",
-                    paste(add_quotes(colnames(tbl), 2L), collapse = ", "))
+            sprintf(
+              "missing: %s",
+              paste(add_quotes(missing_cols, 2L), collapse = ", ")
+            ),
+            sprintf(
+              "available: %s",
+              paste(add_quotes(colnames(tbl), 2L), collapse = ", ")
+            )
           )
         )
       }
@@ -405,9 +428,13 @@ validate_phip_data <- function(x,
       # -- 1) Enforce uniqueness of (key, id) pairs ----------------------------
       .ph_log_info("Checking uniqueness of (key, id) pairs")
       dup_pairs <- tbl |>
-        dplyr::count(dplyr::across(dplyr::all_of(c(key_cols,
-                                                   id_col))),
-                     name = ".n") |>
+        dplyr::count(
+          dplyr::across(dplyr::all_of(c(
+            key_cols,
+            id_col
+          ))),
+          name = ".n"
+        ) |>
         dplyr::filter(.data$.n > 1L)
 
       dup_count <- dup_pairs |>
@@ -432,18 +459,26 @@ validate_phip_data <- function(x,
 
             kv_key <- vapply( # format the key columns
               key_cols,
-              function(k) sprintf("%s=%s",
-                                  k,
-                                  add_quotes(as.character(row_i[[k]]), 1L)),
+              function(k) {
+                sprintf(
+                  "%s=%s",
+                  k,
+                  add_quotes(as.character(row_i[[k]]), 1L)
+                )
+              },
               character(1)
             )
 
-            kv_id <- sprintf("%s=%s", # format the id col
-                             id_col,
-                             add_quotes(as.character(row_i[[id_col]]), 1L))
+            kv_id <- sprintf(
+              "%s=%s", # format the id col
+              id_col,
+              add_quotes(as.character(row_i[[id_col]]), 1L)
+            )
 
-            kv_n <- sprintf(".n=%s", # how many duplicate overall
-                            as.character(row_i[[".n"]]))
+            kv_n <- sprintf(
+              ".n=%s", # how many duplicate overall
+              as.character(row_i[[".n"]])
+            )
 
             paste(c(kv_key, kv_id, kv_n), collapse = ", ") # paste message
           }, character(1))
@@ -478,13 +513,13 @@ validate_phip_data <- function(x,
       # -- 3) Build robust cross of distinct keys * distinct ids ---------------
       .ph_log_info("Building Cartesian product of keys and ids")
       make_cross <- function(tbl_in) {
-        key_tbl <- tbl_in |>  # distinct keys
+        key_tbl <- tbl_in |> # distinct keys
           dplyr::distinct(dplyr::across(dplyr::all_of(key_cols))) |>
           dplyr::transmute(dplyr::across(dplyr::all_of(key_cols)), dummy = 1L)
-        id_tbl <- tbl_in |>   # distinct ids
+        id_tbl <- tbl_in |> # distinct ids
           dplyr::distinct(!!id_sym) |>
           dplyr::transmute(!!id_sym, dummy = 1L)
-        key_tbl |>            # join them
+        key_tbl |> # join them
           dplyr::inner_join(id_tbl, by = "dummy") |>
           dplyr::select(-dummy)
       }
@@ -575,14 +610,17 @@ validate_phip_data <- function(x,
       }
 
       base_cells <- tbl |>
-        dplyr::select(dplyr::all_of(c(key_cols,
-                                      id_col,
-                                      non_recyclable_cols))) |>
+        dplyr::select(dplyr::all_of(c(
+          key_cols,
+          id_col,
+          non_recyclable_cols
+        ))) |>
         dplyr::mutate(!!row_exists_sym := 1L)
 
       # -- 6) Join cross with metadata and current cells -----------------------
       has_join_by <- tryCatch(utils::packageVersion("dplyr") >= "1.1.0",
-                              error = function(e) FALSE)
+        error = function(e) FALSE
+      )
       by_key <- if (has_join_by) dplyr::join_by(!!!key_syms) else key_cols
       by_both <- if (has_join_by) {
         dplyr::join_by(!!!key_syms, !!id_sym)
@@ -611,23 +649,35 @@ validate_phip_data <- function(x,
       more_candidates <- setdiff(have_cols, fill_candidates)
 
       # type of the columns to fill
-      is_num <- function(x) inherits(x, c("numeric", "integer",
-                                          "double", "integer64"))
+      is_num <- function(x) {
+        inherits(x, c(
+          "numeric", "integer",
+          "double", "integer64"
+        ))
+      }
       is_lgl <- function(x) is.logical(x)
 
       # preparing fills
       to_fill_num <- unique(c(
-        intersect(fill_candidates,
-                  names(sample0)[vapply(sample0, is_num, logical(1))]),
-        more_candidates[vapply(more_candidates,
-                               function(cn) is_num(sample0[[cn]]), logical(1))]
+        intersect(
+          fill_candidates,
+          names(sample0)[vapply(sample0, is_num, logical(1))]
+        ),
+        more_candidates[vapply(
+          more_candidates,
+          function(cn) is_num(sample0[[cn]]), logical(1)
+        )]
       ))
 
       to_fill_lgl <- unique(c(
-        intersect(fill_candidates,
-                  names(sample0)[vapply(sample0, is_lgl, logical(1))]),
-        more_candidates[vapply(more_candidates,
-                               function(cn) is_lgl(sample0[[cn]]), logical(1))]
+        intersect(
+          fill_candidates,
+          names(sample0)[vapply(sample0, is_lgl, logical(1))]
+        ),
+        more_candidates[vapply(
+          more_candidates,
+          function(cn) is_lgl(sample0[[cn]]), logical(1)
+        )]
       ))
 
       ## logging progress
@@ -649,30 +699,32 @@ validate_phip_data <- function(x,
       # -- 8) Apply user overrides, then fill remaining num/logical cols -------
       if (!is.null(fill_override) && length(fill_override)) {
         .ph_log_info("Applying user-provided fill overrides",
-          bullets = sprintf("overrides: %s",
-                            paste(names(fill_override),
-                                  collapse = ", "))
+          bullets = sprintf(
+            "overrides: %s",
+            paste(names(fill_override),
+              collapse = ", "
+            )
+          )
         )
 
         ## override the default fills with user-provided values
         # inside your overrides loop
         for (nm in intersect(names(fill_override), colnames(out))) {
-          val     <- fill_override[[nm]]# scalar replacement for introduced rows
+          val <- fill_override[[nm]] # scalar replacement for introduced rows
           col_sym <- rlang::sym(nm)
 
           out <- out |>
             dplyr::mutate(
               !!col_sym := dplyr::if_else(
                 is.na(!!row_exists_sym),
-                val,            # scalar OK; dbplyr will inline it
-                !!col_sym       # <- use the symbol, not .data[[nm]]
+                val, # scalar OK; dbplyr will inline it
+                !!col_sym # <- use the symbol, not .data[[nm]]
               )
             )
 
           to_fill_num <- setdiff(to_fill_num, nm)
           to_fill_lgl <- setdiff(to_fill_lgl, nm)
         }
-
       }
 
       # apply defaults on the remaining columns, not specified by the user
@@ -719,8 +771,9 @@ validate_phip_data <- function(x,
 
         out <- out |>
           dplyr::mutate(!!exist_sym := dplyr::if_else(is.na(!!row_exists_sym),
-                                                      0L,
-                                                      1L))
+            0L,
+            1L
+          ))
       }
 
       # -- 10) Drop sentinel and return ----------------------------------------
@@ -924,8 +977,9 @@ phip_expand_full_grid.phip_data <- function(x,
 #' \dontrun{
 #' lazy <- dplyr::tbl(con, "data_long") |> dplyr::filter(fold_change > 0)
 #' phip_register_tbl(lazy, con,
-#' name = "data_long_pos",
-#'  materialise_table = TRUE)
+#'   name = "data_long_pos",
+#'   materialise_table = TRUE
+#' )
 #' }
 #' @export
 phip_register_tbl <- function(tbl,

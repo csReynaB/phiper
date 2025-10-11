@@ -26,8 +26,10 @@
                      prefix) {
   w <- .ph_opt("width", getOption("width", 80))
   # strwrap: 'initial' for first line, 'prefix' for continuations
-  strwrap(text, width = w, initial = prefix, prefix = strrep(" ",
-                                                             nchar(prefix)))
+  strwrap(text, width = w, initial = prefix, prefix = strrep(
+    " ",
+    nchar(prefix)
+  ))
 }
 
 # Compose multi-depth message lines
@@ -37,7 +39,7 @@
                               headline,
                               step = NULL,
                               bullets = NULL) {
-  base  <- .ph_base_prefix(level)
+  base <- .ph_base_prefix(level)
   stepP <- paste0(strrep(" ", nchar(base)), "-> ")
   bullP <- paste0(strrep(" ", nchar(base)), "  - ")
 
@@ -63,7 +65,9 @@
                          step = NULL,
                          bullets = NULL,
                          verbose = .ph_opt("verbose", TRUE)) {
-  if (!isTRUE(verbose)) return(invisible(character()))
+  if (!isTRUE(verbose)) {
+    return(invisible(character()))
+  }
   lines <- .ph_compose_lines("INFO", headline, step, bullets)
   cat(paste0(lines, collapse = "\n"), "\n", sep = "")
   invisible(lines)
@@ -74,7 +78,9 @@
                        step = NULL,
                        bullets = NULL,
                        verbose = .ph_opt("verbose", TRUE)) {
-  if (!isTRUE(verbose)) return(invisible(character()))
+  if (!isTRUE(verbose)) {
+    return(invisible(character()))
+  }
   lines <- .ph_compose_lines("OK", headline, step, bullets)
   cat(paste0(lines, collapse = "\n"), "\n", sep = "")
   invisible(lines)
@@ -83,22 +89,22 @@
 # Warnings/errors via chk, but formatted to match the style of the logger
 .ph_warn <- function(headline, step = NULL, bullets = NULL, ...) {
   lines <- .ph_compose_lines("WARN", headline, step, bullets)
-  msg   <- paste(lines, collapse = "\n")
+  msg <- paste(lines, collapse = "\n")
   if (requireNamespace("chk", quietly = TRUE)) {
-    chk::wrn(msg, ...)                 # single string -> respects \n
+    chk::wrn(msg, ...) # single string -> respects \n
   } else {
-    warning(msg, call. = FALSE, ...)   # fallback if chk not installed
+    warning(msg, call. = FALSE, ...) # fallback if chk not installed
   }
   invisible(lines)
 }
 
 .ph_abort <- function(headline, step = NULL, bullets = NULL, ...) {
   lines <- .ph_compose_lines("ERROR", headline, step, bullets)
-  msg   <- paste(lines, collapse = "\n")
+  msg <- paste(lines, collapse = "\n")
   if (requireNamespace("chk", quietly = TRUE)) {
-    chk::abort_chk(msg, ...)           # single string -> respects \n
+    chk::abort_chk(msg, ...) # single string -> respects \n
   } else {
-    stop(msg, call. = FALSE, ...)      # fallback if chk not installed
+    stop(msg, call. = FALSE, ...) # fallback if chk not installed
   }
 }
 
@@ -113,18 +119,20 @@
 # upgraded to the unified phiper style
 .chk_cond <- function(condition,
                       error_message,
-                      error   = TRUE,
-                      step    = NULL,
+                      error = TRUE,
+                      step = NULL,
                       bullets = NULL,
                       ...) {
   # log nopthing
-  if (!isTRUE(condition)) return(invisible(FALSE))
+  if (!isTRUE(condition)) {
+    return(invisible(FALSE))
+  }
 
   # print error and abort exec
   if (isTRUE(error)) {
     .ph_abort(headline = error_message, step = step, bullets = bullets, ...)
   } else {
-  # print warning and go on
+    # print warning and go on
     .ph_warn(headline = error_message, step = step, bullets = bullets, ...)
   }
   invisible(TRUE)
@@ -143,7 +151,9 @@
   .ph_log_info(headline = headline, step = step, bullets = bullets, verbose = verbose)
 
   res <- tryCatch(
-    { force(expr) },  # evaluate user's code
+    {
+      force(expr)
+    }, # evaluate user's code
     finally = {
       dt <- round(as.numeric(difftime(Sys.time(), t0, units = "secs")), 3)
       .ph_log_ok(
@@ -168,30 +178,34 @@
 .chk_extension <- function(name,
                            x_name,
                            ext_vec) {
-  if (is.null(ext_vec) || !length(ext_vec)) return(invisible(TRUE))
+  if (is.null(ext_vec) || !length(ext_vec)) {
+    return(invisible(TRUE))
+  }
 
-  base  <- basename(name %||% "")  # extracting filename from paths
+  base <- basename(name %||% "") # extracting filename from paths
   parts <- strsplit(base, "\\.", fixed = FALSE)[[1]] # names + complex ext
 
   # taking last ext after . (eg .tar.gz --> .gz)
-  ext   <- if (length(parts) > 1L){
+  ext <- if (length(parts) > 1L) {
     tolower(paste(parts[-1L], collapse = "."))
   } else {
     ""
   }
 
   norm <- function(x) sub("^\\.+", "", tolower(x)) # normalize ext
-  got  <- if (nzchar(ext)) norm(ext) else "<none>"
-  ok   <- nzchar(ext) && got %in% norm(ext_vec) # final ext check
+  got <- if (nzchar(ext)) norm(ext) else "<none>"
+  ok <- nzchar(ext) && got %in% norm(ext_vec) # final ext check
 
   if (!ok) {
     .ph_abort(
       headline = sprintf("Invalid file extension for `%s`.", x_name),
-      step     = sprintf("validating path: %s", name),
-      bullets  = c(
+      step = sprintf("validating path: %s", name),
+      bullets = c(
         sprintf("got: %s", add_quotes(got, 2L)),
-        sprintf("allowed: %s",
-                word_list(add_quotes(norm(ext_vec), 2L), and_or = "or"))
+        sprintf(
+          "allowed: %s",
+          word_list(add_quotes(norm(ext_vec), 2L), and_or = "or")
+        )
       )
     )
   }
@@ -206,8 +220,12 @@
   if (is.null(x)) {
     # format the default for print
     fmt <- function(v) {
-      if (is.character(v) && length(v) == 1L) return(add_quotes(v, 2L))
-      if (is.atomic(v)   && length(v) == 1L) return(as.character(v))
+      if (is.character(v) && length(v) == 1L) {
+        return(add_quotes(v, 2L))
+      }
+      if (is.atomic(v) && length(v) == 1L) {
+        return(as.character(v))
+      }
       sprintf("<%s>", paste(class(v), collapse = "/"))
     }
 
@@ -226,7 +244,6 @@
 .chk_path <- function(path,
                       arg_name,
                       extension) {
-
   ## error when path not a string
   .chk_cond(
     !chk::vld_string(path),
@@ -245,9 +262,11 @@
 
   # optionally extension check if provided
   if (!missing(extension) && length(extension)) {
-    .chk_extension(path,
-                   arg_name,
-                   extension)
+    .chk_extension(
+      path,
+      arg_name,
+      extension
+    )
   }
 
   invisible(TRUE)
@@ -259,7 +278,6 @@ word_list <- function(word_list = NULL,
                       and_or = "and",
                       is_are = FALSE,
                       quotes = FALSE) {
-
   # Make "a and b" / "a, b, and c"; optionally append "is/are".
   word_list <- setdiff(word_list, c(NA_character_, ""))
 
@@ -287,9 +305,11 @@ word_list <- function(word_list = NULL,
     if (len_wl == 2L) {
       out <- sprintf("%s %s %s", word_list[1L], and_or, word_list[2L])
     } else {
-      out <- sprintf("%s, %s %s",
-                     paste(word_list[-len_wl], collapse = ", "),
-                     and_or, word_list[len_wl])
+      out <- sprintf(
+        "%s, %s %s",
+        paste(word_list[-len_wl], collapse = ", "),
+        and_or, word_list[len_wl]
+      )
     }
   }
 
@@ -303,8 +323,10 @@ word_list <- function(word_list = NULL,
 # or define the quotes itself as a string
 add_quotes <- function(x,
                        quotes = 2L) {
-  if (isFALSE(quotes)) return(x)
-  if (isTRUE(quotes))  quotes <- '"'
+  if (isFALSE(quotes)) {
+    return(x)
+  }
+  if (isTRUE(quotes)) quotes <- '"'
 
   if (chk::vld_string(quotes)) {
     return(paste0(quotes, x, quotes))
@@ -313,16 +335,20 @@ add_quotes <- function(x,
   if (!chk::vld_count(quotes) || quotes > 2) {
     .ph_abort(
       headline = "Invalid `quotes` argument.",
-      step     = "formatting add_quotes()",
-      bullets  = c(
+      step = "formatting add_quotes()",
+      bullets = c(
         "allowed: FALSE, TRUE, 0, 1, 2, or a single-character string",
         sprintf("got class: %s", paste(class(quotes), collapse = "/"))
       )
     )
   }
 
-  if (quotes == 0L) return(x)
-  if (quotes == 1L) return(sprintf("'%s'", x))
+  if (quotes == 0L) {
+    return(x)
+  }
+  if (quotes == 1L) {
+    return(sprintf("'%s'", x))
+  }
   sprintf('"%s"', x)
 }
 
@@ -341,7 +367,7 @@ add_quotes <- function(x,
 # ensure peptide_library is queryable from the SAME connection as data_long
 .ensure_peplib_on_main <- function(x, schema_alias = "peplib") {
   main_con <- dbplyr::remote_con(x$data_long)
-  pep_con  <- if (!is.null(x$meta$peptide_con)) {
+  pep_con <- if (!is.null(x$meta$peptide_con)) {
     x$meta$peptide_con
   } else {
     dbplyr::remote_con(x$peptide_library)
@@ -349,43 +375,54 @@ add_quotes <- function(x,
 
   # try zero-copy ATTACH when both are DuckDB
   if (inherits(main_con, "duckdb_connection") &&
-      inherits(pep_con, "duckdb_connection")) {
+    inherits(pep_con, "duckdb_connection")) {
     pep_db_path <- try(pep_con@driver@dbdir, silent = TRUE)
     if (!inherits(pep_db_path, "try-error") &&
-        is.character(pep_db_path) &&
-        nzchar(pep_db_path)) {
-
+      is.character(pep_db_path) &&
+      nzchar(pep_db_path)) {
       # ATTACH (ignore "already attached")
-      try(DBI::dbExecute(main_con,
-                         sprintf("ATTACH '%s' AS %s;",
-                                 pep_db_path,
-                                 schema_alias)),
-          silent = TRUE)
+      try(
+        DBI::dbExecute(
+          main_con,
+          sprintf(
+            "ATTACH '%s' AS %s;",
+            pep_db_path,
+            schema_alias
+          )
+        ),
+        silent = TRUE
+      )
 
       # Detect base table name (fallback: "peptide_meta")
-      base_name <- tryCatch({
-        nm <- dbplyr::remote_name(x$peptide_library)
-        if (is.null(nm) || !nzchar(nm)) {
-          "peptide_meta"
-        } else {
-          sub("^.*\\.", "", nm)
-        }
-      }, error = function(e) "peptide_meta")
+      base_name <- tryCatch(
+        {
+          nm <- dbplyr::remote_name(x$peptide_library)
+          if (is.null(nm) || !nzchar(nm)) {
+            "peptide_meta"
+          } else {
+            sub("^.*\\.", "", nm)
+          }
+        },
+        error = function(e) "peptide_meta"
+      )
 
       # Try both two-part and three-part references
       try_tbl <- function(sql_expr) {
         tryCatch(dplyr::tbl(main_con, dbplyr::sql(sql_expr)),
-                 error = function(e) NULL)
+          error = function(e) NULL
+        )
       }
 
       candidates <- c(
-        sprintf("SELECT * FROM %s.%s",      schema_alias, base_name),
+        sprintf("SELECT * FROM %s.%s", schema_alias, base_name),
         sprintf("SELECT * FROM %s.main.%s", schema_alias, base_name)
       )
 
       for (q in candidates) {
         out <- try_tbl(q)
-        if (!is.null(out)) return(out)
+        if (!is.null(out)) {
+          return(out)
+        }
       }
       # If both fail, we’ll fall through to the copy_to() fallback below.
     }
@@ -394,7 +431,8 @@ add_quotes <- function(x,
   # Fallback: copy peptidelib into main_con as a TEMP table
   peplib_local <- dplyr::collect(x$peptide_library)
   tmp_name <- paste0("peptide_meta_tmp_", as.integer(Sys.time()))
-  dplyr::copy_to(main_con, peplib_local, tmp_name, temporary = TRUE,
-                 overwrite = TRUE)
+  dplyr::copy_to(main_con, peplib_local, tmp_name,
+    temporary = TRUE,
+    overwrite = TRUE
+  )
 }
-

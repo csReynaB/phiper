@@ -60,12 +60,10 @@ new_phip_data <- function(data_long,
                           auto_expand = TRUE,
                           materialise_table = TRUE,
                           meta = list()) {
-
   .ph_with_timing(
     headline = "Constructing <phip_data> object",
-    step     = "new_phip_data()",
+    step = "new_phip_data()",
     expr = {
-
       backend <- if (is.null(backend)) {
         "duckdb" # implicit default
       } else {
@@ -138,8 +136,8 @@ new_phip_data <- function(data_long,
 
       # pick the correct column ----------------------------------------------
       meta$full_cross <- is_full_cross(data_long,
-                                       peptide = "peptide_id",
-                                       sample  = "sample_id"
+        peptide = "peptide_id",
+        sample  = "sample_id"
       )
 
       # --------------------------------------------------------------------------

@@ -417,22 +417,24 @@ anti_join.phip_data <- function(x, y, ...) {
 #' @return Modified <phip_data> with updated `data_long`.
 #' @examples
 #' \dontrun{
-#'   pd <- add_exist(pd)                  # adds "exist" := 1L
-#'   pd <- add_exist(pd, overwrite=TRUE)  # overwrites if present
+#' pd <- add_exist(pd) # adds "exist" := 1L
+#' pd <- add_exist(pd, overwrite = TRUE) # overwrites if present
 #' }
 #' @export add_exist
 add_exist <- function(phip_data,
-                                exist_col = "exist",
-                                overwrite = FALSE,
-                                ...) {
+                      exist_col = "exist",
+                      overwrite = FALSE,
+                      ...) {
   x <- phip_data
   stopifnot(inherits(x, "phip_data"))
   .data <- rlang::.data
 
   .ph_with_timing(
     headline = "Ensuring existence flag on data_long",
-    step     = sprintf("column: %s; overwrite: %s",
-                       add_quotes(exist_col, 1L), as.character(overwrite)),
+    step = sprintf(
+      "column: %s; overwrite: %s",
+      add_quotes(exist_col, 1L), as.character(overwrite)
+    ),
     expr = {
       tbl <- x$data_long
 
@@ -440,8 +442,8 @@ add_exist <- function(phip_data,
         if (!isTRUE(overwrite)) {
           .ph_abort(
             headline = "Existence column already present.",
-            step     = "input validation",
-            bullets  = c(
+            step = "input validation",
+            bullets = c(
               sprintf("column: %s", add_quotes(exist_col, 2L)),
               "set overwrite = TRUE to replace existing values"
             )

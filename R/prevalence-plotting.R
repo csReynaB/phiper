@@ -17,53 +17,62 @@
 #' @export
 ph_scatterplot <- function(
     comparison_tbl,
-    ranks         = NULL,
-    facet_pairs   = TRUE,
-    facet_nrow    = NULL,
-    facet_ncol    = NULL,
-    sparse_rank   = NULL,
+    ranks = NULL,
+    facet_pairs = TRUE,
+    facet_nrow = NULL,
+    facet_ncol = NULL,
+    sparse_rank = NULL,
     sparse_drop_pct = 0,
-    sparse_seed   = NULL,
+    sparse_seed = NULL,
     significant_colors = c(
       "not significant"                 = "#386cb0",
       "significant prior correction"    = "#1b9e77",
       "significant post FDR correction" = "#e31a1c"
     ),
-    interactive   = TRUE
-) {
+    interactive = TRUE) {
   .ph_with_timing(
     headline = "make_interactive_scatterplot",
     expr = {
-      need <- c("rank","feature","group_col","group1","group2","percent1","percent2","category")
+      need <- c("rank", "feature", "group_col", "group1", "group2", "percent1", "percent2", "category")
       have <- tryCatch(colnames(comparison_tbl), error = function(...) character())
       if (length(have) == 0 && inherits(comparison_tbl, "tbl_sql")) have <- colnames(comparison_tbl)
       miss <- setdiff(need, have)
       if (length(miss)) .ph_abort("Comparison table is missing required columns", bullets = paste("-", miss))
 
-      keep_cols <- c("rank","feature","group_col","group1","group2","percent1","percent2","category")
+      keep_cols <- c("rank", "feature", "group_col", "group1", "group2", "percent1", "percent2", "category")
       if (!is.null(ranks) && length(ranks)) comparison_tbl <- dplyr::filter(comparison_tbl, rank %in% ranks)
-      df <- comparison_tbl |> dplyr::select(dplyr::all_of(keep_cols)) |> dplyr::collect()
-      if (!nrow(df)) { .ph_warn("No rows after filtering; returning empty list."); return(invisible(list())) }
+      df <- comparison_tbl |>
+        dplyr::select(dplyr::all_of(keep_cols)) |>
+        dplyr::collect()
+      if (!nrow(df)) {
+        .ph_warn("No rows after filtering; returning empty list.")
+        return(invisible(list()))
+      }
 
       df <- df |>
         dplyr::mutate(
-          rank      = as.character(rank),
+          rank = as.character(rank),
           group_col = as.character(group_col),
-          group1    = as.character(group1),
-          group2    = as.character(group2),
-          percent1  = as.numeric(percent1),
-          percent2  = as.numeric(percent2),
-          category  = as.character(category),
+          group1 = as.character(group1),
+          group2 = as.character(group2),
+          percent1 = as.numeric(percent1),
+          percent2 = as.numeric(percent2),
+          category = as.character(category),
           pair_label = paste0(group1, " vs ", group2)
         )
 
       .downsample_uniform_2d <- function(dat, pool_idx, xcol, ycol, keep_n, seed = NULL) {
-        if (keep_n >= length(pool_idx) || keep_n <= 0L) return(pool_idx)
+        if (keep_n >= length(pool_idx) || keep_n <= 0L) {
+          return(pool_idx)
+        }
         if (!is.null(seed)) set.seed(as.integer(seed))
-        x <- dat[[xcol]][pool_idx]; y <- dat[[ycol]][pool_idx]
+        x <- dat[[xcol]][pool_idx]
+        y <- dat[[ycol]][pool_idx]
         G <- max(1L, ceiling(sqrt(keep_n)))
-        xr <- range(x, finite = TRUE); if (diff(xr) == 0) xr <- xr + c(-0.5, 0.5)
-        yr <- range(y, finite = TRUE); if (diff(yr) == 0) yr <- yr + c(-0.5, 0.5)
+        xr <- range(x, finite = TRUE)
+        if (diff(xr) == 0) xr <- xr + c(-0.5, 0.5)
+        yr <- range(y, finite = TRUE)
+        if (diff(yr) == 0) yr <- yr + c(-0.5, 0.5)
         bx <- pmin(G, pmax(1L, as.integer(floor((x - xr[1]) / diff(xr) * G) + 1L)))
         by <- pmin(G, pmax(1L, as.integer(floor((y - yr[1]) / diff(yr) * G) + 1L)))
         bins <- split(seq_along(pool_idx), paste(bx, by, sep = "_"))
@@ -73,7 +82,8 @@ ph_scatterplot <- function(
           for (b in order_bins) {
             idxs <- bins[[b]]
             if (length(idxs)) {
-              pick <- sample(idxs, 1L); keep <- c(keep, pick)
+              pick <- sample(idxs, 1L)
+              keep <- c(keep, pick)
               bins[[b]] <- setdiff(bins[[b]], pick)
               if (length(keep) >= keep_n) break
             }
@@ -93,15 +103,17 @@ ph_scatterplot <- function(
             keep_n <- length(pool_idx) - n_drop
             if (keep_n > 0L) {
               keep_pool <- .downsample_uniform_2d(df, pool_idx, "percent1", "percent2", keep_n, sparse_seed)
-              keep_mask <- rep(TRUE, nrow(df)); keep_mask[setdiff(pool_idx, keep_pool)] <- FALSE
+              keep_mask <- rep(TRUE, nrow(df))
+              keep_mask[setdiff(pool_idx, keep_pool)] <- FALSE
               df <- df[keep_mask, , drop = FALSE]
               .ph_log_info("Downsampled 'not significant' rows (uniform 2D coverage)",
-                           bullets = c(
-                             paste0("rank: ", sparse_rank),
-                             paste0("pool: ", length(pool_idx)),
-                             paste0("kept (ns): ", keep_n),
-                             paste0("dropped (ns): ", n_drop)
-                           ))
+                bullets = c(
+                  paste0("rank: ", sparse_rank),
+                  paste0("pool: ", length(pool_idx)),
+                  paste0("kept (ns): ", keep_n),
+                  paste0("dropped (ns): ", n_drop)
+                )
+              )
             }
           }
         }
@@ -111,7 +123,7 @@ ph_scatterplot <- function(
         dplyr::mutate(
           tooltip_txt = paste0(
             "Feature: ", feature, "<br>",
-            "Rank: ",   rank,    "<br>",
+            "Rank: ", rank, "<br>",
             group1, " %: ", signif(percent1, 3), "<br>",
             group2, " %: ", signif(percent2, 3), "<br>",
             "Pair: ", pair_label, "<br>",
@@ -128,7 +140,7 @@ ph_scatterplot <- function(
       }
 
       # fixed limits & ticks
-      lims   <- c(-10, 110)
+      lims <- c(-10, 110)
       breaks <- c(0, 25, 50, 75, 100)
 
       build_rank_plot <- function(dat_rank) {
@@ -168,7 +180,7 @@ ph_scatterplot <- function(
 
         if (facet_pairs) {
           base <- base + ggplot2::facet_wrap(
-            ~ pair_label,
+            ~pair_label,
             scales = "fixed",
             nrow = facet_nrow, ncol = facet_ncol
           )
@@ -204,7 +216,9 @@ ph_scatterplot <- function(
                   margin = list(l = 86, r = 60, b = 86, t = 80)
                 )
               plt
-            } else p
+            } else {
+              p
+            }
           })
           names(out) <- names(pieces)
           out
@@ -215,7 +229,10 @@ ph_scatterplot <- function(
       by_rank <- split(df, df$rank, drop = TRUE)
       plots <- lapply(names(by_rank), function(rk) {
         dat <- by_rank[[rk]]
-        if (!nrow(dat)) { .ph_warn(paste0("No rows for rank '", rk, "'")); return(NULL) }
+        if (!nrow(dat)) {
+          .ph_warn(paste0("No rows for rank '", rk, "'"))
+          return(NULL)
+        }
         build_rank_plot(dat)
       })
       names(plots) <- names(by_rank)
@@ -256,28 +273,27 @@ ph_scatterplot <- function(
 #' @export
 ph_volcano <- function(
     comparison_tbl,
-    ranks           = NULL,
-    facet_pairs     = TRUE,
-    facet_nrow      = NULL,
-    facet_ncol      = NULL,
-    sparse_rank     = NULL,
+    ranks = NULL,
+    facet_pairs = TRUE,
+    facet_nrow = NULL,
+    facet_ncol = NULL,
+    sparse_rank = NULL,
     sparse_drop_pct = 0,
-    sparse_seed     = NULL,
-    fc_cut          = 1,
-    p_cut           = 0.05,
+    sparse_seed = NULL,
+    fc_cut = 1,
+    p_cut = 0.05,
     significant_colors = c(
       "not significant"                 = "#386cb0",
       "significant prior correction"    = "#1b9e77",
       "significant post FDR correction" = "#e31a1c"
     ),
-    interactive     = TRUE
-) {
+    interactive = TRUE) {
   .ph_with_timing(
     headline = "make_interactive_volcano",
     expr = {
       # required + optional
-      required_cols <- c("rank","feature","group_col","group1","group2","category")
-      optional_cols <- c("ratio","prop1","prop2","p_raw","p_adj","pvals_not_adj")
+      required_cols <- c("rank", "feature", "group_col", "group1", "group2", "category")
+      optional_cols <- c("ratio", "prop1", "prop2", "p_raw", "p_adj", "pvals_not_adj")
 
       # columns present (works for lazy)
       have <- tryCatch(colnames(comparison_tbl), error = function(...) character())
@@ -305,17 +321,17 @@ ph_volcano <- function(
 
       df <- df |>
         dplyr::mutate(
-          rank      = as.character(rank),
+          rank = as.character(rank),
           group_col = as.character(group_col),
-          group1    = as.character(group1),
-          group2    = as.character(group2),
-          category  = as.character(category),
+          group1 = as.character(group1),
+          group2 = as.character(group2),
+          category = as.character(category),
           pair_label = paste0(group1, " vs ", group2)
         )
 
       # ratio fallback
       if (!"ratio" %in% colnames(df)) {
-        if (!all(c("prop1","prop2") %in% colnames(df))) {
+        if (!all(c("prop1", "prop2") %in% colnames(df))) {
           .ph_abort("Need either 'ratio' or both 'prop1' and 'prop2' to build volcano.")
         }
         df <- df |>
@@ -327,7 +343,7 @@ ph_volcano <- function(
       }
 
       # p column selection; clamp at machine eps to avoid Inf
-      p_col <- intersect(c("p_raw","pvals_not_adj","p_adj"), colnames(df))[1]
+      p_col <- intersect(c("p_raw", "pvals_not_adj", "p_adj"), colnames(df))[1]
       if (is.na(p_col)) .ph_abort("No p-value column found (need one of: p_raw, pvals_not_adj, p_adj).")
 
       df <- df |>
@@ -356,12 +372,13 @@ ph_volcano <- function(
               drop_idx <- sample(pool_idx, size = n_drop, replace = FALSE)
               df <- df[-drop_idx, , drop = FALSE]
               .ph_log_info("Downsampled 'not significant' rows",
-                           bullets = c(
-                             paste0("rank: ", sparse_rank),
-                             paste0("pool: ", n_pool),
-                             paste0("dropped: ", n_drop),
-                             paste0("kept: ", n_pool - n_drop)
-                           ))
+                bullets = c(
+                  paste0("rank: ", sparse_rank),
+                  paste0("pool: ", n_pool),
+                  paste0("dropped: ", n_drop),
+                  paste0("kept: ", n_pool - n_drop)
+                )
+              )
             }
           }
         }
@@ -372,9 +389,9 @@ ph_volcano <- function(
         dplyr::mutate(
           tooltip_txt = paste0(
             "Feature: ", feature, "<br>",
-            "Rank: ",   rank,    "<br>",
+            "Rank: ", rank, "<br>",
             "log2(ratio): ", signif(log2ratio, 3), "<br>",
-            "-log10(p): ",     signif(nlog10p, 3), "<br>",
+            "-log10(p): ", signif(nlog10p, 3), "<br>",
             "Pair: ", pair_label, "<br>",
             "Category: ", category
           )
@@ -412,10 +429,12 @@ ph_volcano <- function(
           ggplot2::theme(legend.position = "none")
 
         if (facet_pairs) {
-          base <- base + ggplot2::facet_wrap(~ pair_label, scales = "fixed",
-                                             nrow = facet_nrow, ncol = facet_ncol)
+          base <- base + ggplot2::facet_wrap(~pair_label,
+            scales = "fixed",
+            nrow = facet_nrow, ncol = facet_ncol
+          )
           if (interactive) {
-            p <- plotly::ggplotly(base, tooltip = c("text","x","y"))
+            p <- plotly::ggplotly(base, tooltip = c("text", "x", "y"))
             p <- p |>
               plotly::layout(
                 showlegend = FALSE,
@@ -433,7 +452,7 @@ ph_volcano <- function(
             subd <- pieces[[lbl]]
             p <- base %+% subd + ggplot2::ggtitle(paste0("Rank: ", unique(subd$rank)[1], " • ", lbl))
             if (interactive) {
-              plt <- plotly::ggplotly(p, tooltip = c("text","x","y"))
+              plt <- plotly::ggplotly(p, tooltip = c("text", "x", "y"))
               plt <- plt |>
                 plotly::layout(
                   showlegend = FALSE,
@@ -441,7 +460,9 @@ ph_volcano <- function(
                   yaxis = list(automargin = TRUE, title = list(standoff = 10))
                 )
               plt
-            } else p
+            } else {
+              p
+            }
           })
           names(out) <- names(pieces)
           out

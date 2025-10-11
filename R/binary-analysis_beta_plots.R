@@ -30,54 +30,57 @@
 # now supports continuous-time shading (tints within each group)
 # -------------------------------------------------------------------
 plot_beta_pcoa <- function(x,
-                           view     = NULL,
-                           subview  = NULL,
-                           axes     = c(1, 2),
-                           group_col   = "group",
-                           time_fac    = "time_fac",
-                           time_cont   = "time_cont",
+                           view = NULL,
+                           subview = NULL,
+                           axes = c(1, 2),
+                           group_col = "group",
+                           time_fac = "time_fac",
+                           time_cont = "time_cont",
                            # shading ----------------------------------------------------------------
-                           shade       = c("auto","time","group","none"),
-                           shade_norm  = c("global","by_group"),   # for continuous time
-                           shade_direction = c("light_to_dark","dark_to_light"),
-                           shade_range = c(0.15, 0.85),            # min→max tint to white
-                           base_colors = NULL,                     # named by group (optional)
+                           shade = c("auto", "time", "group", "none"),
+                           shade_norm = c("global", "by_group"), # for continuous time
+                           shade_direction = c("light_to_dark", "dark_to_light"),
+                           shade_range = c(0.15, 0.85), # min→max tint to white
+                           base_colors = NULL, # named by group (optional)
                            # centroids / ellipses ---------------------------------------------------
                            show_centroids = TRUE,
-                           centroid_by = c("auto","group","time","group_time"),
-                           connect_centroids = c("none","group","time"),
+                           centroid_by = c("auto", "group", "time", "group_time"),
+                           connect_centroids = c("none", "group", "time"),
                            show_ellipses = TRUE,
-                           ellipse_by   = c("group"),
-                           ellipse_type = c("t","norm","euclid"),
+                           ellipse_by = c("group"),
+                           ellipse_type = c("t", "norm", "euclid"),
                            ellipse_level = 0.95,
                            # geoms -------------------------------------------------------------------
-                           point_size   = 1.5,
-                           point_alpha  = 0.55,
+                           point_size = 1.5,
+                           point_alpha = 0.55,
                            centroid_size = 3,
                            # CAP biplot --------------------------------------------------------------
                            add_biplot = FALSE,
                            biplot_label_size = 3) {
-
   # ---- tiny helpers ----------------------------------------------------------
   `%||%` <- function(a, b) if (is.null(a)) b else a
   .has <- function(nm, df) !is.null(nm) && nm %in% names(df)
   .ph_info <- function(msg) {
-    if (exists(".ph_log_info", mode = "function")) .ph_log_info(msg, step = "plot_beta_pcoa")
-    else if (exists(".phi", mode = "function")) .phi(msg) else message(sprintf("[INFO] %s", msg))
+    if (exists(".ph_log_info", mode = "function")) {
+      .ph_log_info(msg, step = "plot_beta_pcoa")
+    } else if (exists(".phi", mode = "function")) .phi(msg) else message(sprintf("[INFO] %s", msg))
   }
   .ph_err <- function(msg) {
-    if (exists(".ph_abort", mode = "function")) .ph_abort(msg)
-    else if (exists(".phe", mode = "function")) .phe(msg) else stop(msg, call. = FALSE)
+    if (exists(".ph_abort", mode = "function")) {
+      .ph_abort(msg)
+    } else if (exists(".phe", mode = "function")) .phe(msg) else stop(msg, call. = FALSE)
   }
 
   .blend_hex <- function(c1, c2 = "#FFFFFF", w = 0.5) {
-    r1 <- grDevices::col2rgb(c1)/255
-    r2 <- grDevices::col2rgb(c2)/255
+    r1 <- grDevices::col2rgb(c1) / 255
+    r2 <- grDevices::col2rgb(c2) / 255
     out <- (1 - w) * r1 + w * r2
     grDevices::rgb(out[1], out[2], out[3])
   }
   .make_shades <- function(base_hex, n, range = c(0.15, 0.85)) {
-    if (n <= 1) return(base_hex)
+    if (n <= 1) {
+      return(base_hex)
+    }
     w <- seq(range[1], range[2], length.out = n)
     vapply(w, function(wi) .blend_hex(base_hex, "#FFFFFF", wi), character(1))
   }
@@ -86,13 +89,14 @@ plot_beta_pcoa <- function(x,
       pal <- get("phip_palette", inherits = TRUE)
       if (length(pal) < n) rep(pal, length.out = n) else pal[seq_len(n)]
     } else {
-      c("#1f78b4","#33a02c","#e31a1c","#ff7f00","#6a3d9a","#b15928") |> rep(length.out = n)
+      c("#1f78b4", "#33a02c", "#e31a1c", "#ff7f00", "#6a3d9a", "#b15928") |> rep(length.out = n)
     }
   }
   .build_shaded_map <- function(groups, times, base_colors = NULL,
-                                default_palette = NULL, shade_range = c(0.15,0.85),
+                                default_palette = NULL, shade_range = c(0.15, 0.85),
                                 sep = " | ") {
-    groups <- as.character(groups); times <- as.character(times)
+    groups <- as.character(groups)
+    times <- as.character(times)
     if (is.null(default_palette)) default_palette <- .phip_pal(length(groups))
     # bases (respect user-provided names)
     if (is.null(base_colors)) {
@@ -105,7 +109,7 @@ plot_beta_pcoa <- function(x,
     for (g in groups) {
       shades <- .make_shades(base_colors[[g]], length(times), range = shade_range)
       names(shades) <- paste(g, times, sep = sep)
-      fill_vals    <- c(fill_vals, shades)
+      fill_vals <- c(fill_vals, shades)
       outline_vals <- c(outline_vals, stats::setNames(rep(base_colors[[g]], length(times)), names(shades)))
     }
     list(fill = fill_vals, outline = outline_vals, base = base_colors)
@@ -118,22 +122,24 @@ plot_beta_pcoa <- function(x,
   centroid_by <- match.arg(centroid_by)
   connect_centroids <- match.arg(connect_centroids)
   ellipse_type <- match.arg(ellipse_type)
-  ellipse_by <- match.arg(ellipse_by, c("none","group","time","group_time"), several.ok = TRUE)
+  ellipse_by <- match.arg(ellipse_by, c("none", "group", "time", "group_time"), several.ok = TRUE)
   if ("none" %in% ellipse_by) ellipse_by <- character(0)
 
   method <- attr(x, "method_pcoa") %||% "joint"
-  if (is.null(view))    view    <- names(x)[1]
+  if (is.null(view)) view <- names(x)[1]
   if (is.null(subview)) subview <- names(x[[view]])[1]
 
-  .ph_info(sprintf("method: %s | view: %s | subview: %s | axes: %s:%s",
-                   method, view, subview, axes[1], axes[2]))
+  .ph_info(sprintf(
+    "method: %s | view: %s | subview: %s | axes: %s:%s",
+    method, view, subview, axes[1], axes[2]
+  ))
 
   sv <- x[[view]][[subview]]
   df <- sv$pcoa
   if (is.null(df) || !nrow(df)) .ph_err("PCoA/CAP scores not found.")
 
   has_group <- .has(group_col, df)
-  has_timeF <- .has(time_fac,  df) && any(!is.na(df[[time_fac]]))
+  has_timeF <- .has(time_fac, df) && any(!is.na(df[[time_fac]]))
   has_timeC <- .has(time_cont, df) && any(!is.na(df[[time_cont]]))
 
   # axis names + labels w/ % explained
@@ -142,12 +148,15 @@ plot_beta_pcoa <- function(x,
   if (!all(ax_names %in% names(df))) {
     .ph_err(sprintf("Requested axes not found: %s", paste(ax_names[!ax_names %in% names(df)], collapse = ", ")))
   }
-  ax1 <- ax_names[1]; ax2 <- ax_names[2]
+  ax1 <- ax_names[1]
+  ax2 <- ax_names[2]
   ve <- sv$var_explained
   if (!is.null(ve) && nrow(ve) == 1) {
     p1 <- suppressWarnings(as.numeric(ve[[paste0("%", axis_prefix, axes[1])]]))
     p2 <- suppressWarnings(as.numeric(ve[[paste0("%", axis_prefix, axes[2])]]))
-  } else p1 <- p2 <- NA_real_
+  } else {
+    p1 <- p2 <- NA_real_
+  }
   xlab <- if (is.finite(p1)) sprintf("%s%d (%.1f%%)", axis_prefix, axes[1], p1) else ax1
   ylab <- if (is.finite(p2)) sprintf("%s%d (%.1f%%)", axis_prefix, axes[2], p2) else ax2
 
@@ -159,10 +168,14 @@ plot_beta_pcoa <- function(x,
   if (has_timeF) {
     df[[time_fac]] <- droplevels(factor(df[[time_fac]]))
     time_levels <- levels(df[[time_fac]])
-  } else time_levels <- character(0)
+  } else {
+    time_levels <- character(0)
+  }
 
-  .ph_info(sprintf("n=%d points | groups: %d | time_cont: %s | time_fac: %s",
-                   nrow(df), nlevels(groups), has_timeC, has_timeF))
+  .ph_info(sprintf(
+    "n=%d points | groups: %d | time_cont: %s | time_fac: %s",
+    nrow(df), nlevels(groups), has_timeC, has_timeF
+  ))
 
   # ---- palettes / shading ----------------------------------------------------
   pal_default <- .phip_pal(length(group_levels))
@@ -182,11 +195,13 @@ plot_beta_pcoa <- function(x,
   shade_maps <- NULL
   if (shade == "time" && has_timeF) {
     df$gt <- interaction(df[[group_col]], df[[time_fac]],
-                         sep = " | ", drop = TRUE, lex.order = TRUE)
+      sep = " | ", drop = TRUE, lex.order = TRUE
+    )
     shade_maps <- .build_shaded_map(group_levels, time_levels,
-                                    base_colors = base_map,
-                                    default_palette = pal_default,
-                                    shade_range = shade_range)
+      base_colors = base_map,
+      default_palette = pal_default,
+      shade_range = shade_range
+    )
   }
 
   # For continuous time: compute a per-point hex fill (identity scale)
@@ -194,21 +209,26 @@ plot_beta_pcoa <- function(x,
     # normalize months across ALL points or per group
     if (shade_norm == "by_group") {
       df$..t_norm <- ave(df[[time_cont]], df[[group_col]], FUN = function(z) {
-        z <- as.numeric(z); rng <- range(z, na.rm = TRUE)
-        if (!is.finite(rng[1]) || rng[1] == rng[2]) return(rep(0.5, length(z)))
+        z <- as.numeric(z)
+        rng <- range(z, na.rm = TRUE)
+        if (!is.finite(rng[1]) || rng[1] == rng[2]) {
+          return(rep(0.5, length(z)))
+        }
         (z - rng[1]) / (rng[2] - rng[1])
       })
     } else {
-      z  <- as.numeric(df[[time_cont]])
+      z <- as.numeric(df[[time_cont]])
       rng <- range(z, na.rm = TRUE)
-      df$..t_norm <- if (!is.finite(rng[1]) || rng[1] == rng[2]) rep(0.5, length(z)) else (z - rng[1])/(rng[2]-rng[1])
+      df$..t_norm <- if (!is.finite(rng[1]) || rng[1] == rng[2]) rep(0.5, length(z)) else (z - rng[1]) / (rng[2] - rng[1])
     }
     if (shade_direction == "dark_to_light") df$..t_norm <- 1 - df$..t_norm
     # map to tint weights inside shade_range
     df$..w <- shade_range[1] + df$..t_norm * (shade_range[2] - shade_range[1])
     # hex per point (tint base group color towards white)
     df$..fill_hex <- mapply(function(g, w) .blend_hex(base_map[[as.character(g)]], "#FFFFFF", w),
-                            df[[group_col]], df$..w, USE.NAMES = FALSE)
+      df[[group_col]], df$..w,
+      USE.NAMES = FALSE
+    )
   }
 
   # ---- centroids (granularity) ----------------------------------------------
@@ -221,25 +241,31 @@ plot_beta_pcoa <- function(x,
     if (centroid_by == "group") {
       cent <- df |>
         dplyr::group_by(.data[[group_col]]) |>
-        dplyr::summarise(cx = mean(.data[[ax1]], na.rm = TRUE),
-                         cy = mean(.data[[ax2]], na.rm = TRUE),
-                         .groups = "drop") |>
+        dplyr::summarise(
+          cx = mean(.data[[ax1]], na.rm = TRUE),
+          cy = mean(.data[[ax2]], na.rm = TRUE),
+          .groups = "drop"
+        ) |>
         dplyr::rename(group_lab = !!group_col)
     } else if (centroid_by == "time") {
       if (!has_timeF) .ph_err("centroid_by='time' requires a categorical time column.")
       cent <- df |>
         dplyr::group_by(.data[[time_fac]]) |>
-        dplyr::summarise(cx = mean(.data[[ax1]], na.rm = TRUE),
-                         cy = mean(.data[[ax2]], na.rm = TRUE),
-                         .groups = "drop") |>
+        dplyr::summarise(
+          cx = mean(.data[[ax1]], na.rm = TRUE),
+          cy = mean(.data[[ax2]], na.rm = TRUE),
+          .groups = "drop"
+        ) |>
         dplyr::rename(time_lab = !!time_fac)
     } else if (centroid_by == "group_time") {
       if (!has_timeF) .ph_err("centroid_by='group_time' requires a categorical time column.")
       cent <- df |>
         dplyr::group_by(.data[[group_col]], .data[[time_fac]]) |>
-        dplyr::summarise(cx = mean(.data[[ax1]], na.rm = TRUE),
-                         cy = mean(.data[[ax2]], na.rm = TRUE),
-                         .groups = "drop") |>
+        dplyr::summarise(
+          cx = mean(.data[[ax1]], na.rm = TRUE),
+          cy = mean(.data[[ax2]], na.rm = TRUE),
+          .groups = "drop"
+        ) |>
         dplyr::rename(group_lab = !!group_col, time_lab = !!time_fac)
       cent$time_ord <- as.integer(factor(cent$time_lab, levels = time_levels))
       cent$gt <- interaction(cent$group_lab, cent$time_lab, sep = " | ", drop = TRUE)
@@ -254,8 +280,10 @@ plot_beta_pcoa <- function(x,
     p <- p +
       ggplot2::geom_point(
         data = df,
-        ggplot2::aes(x = .data[[ax1]], y = .data[[ax2]],
-                     fill = .data$gt, color = .data[[group_col]]),
+        ggplot2::aes(
+          x = .data[[ax1]], y = .data[[ax2]],
+          fill = .data$gt, color = .data[[group_col]]
+        ),
         shape = 21, size = point_size, alpha = point_alpha, stroke = 0.6
       ) +
       ggplot2::scale_fill_manual(values = shade_maps$fill, name = "group × time") +
@@ -265,8 +293,10 @@ plot_beta_pcoa <- function(x,
     p <- p +
       ggplot2::geom_point(
         data = df,
-        ggplot2::aes(x = .data[[ax1]], y = .data[[ax2]],
-                     fill = .data$..fill_hex, color = .data[[group_col]]),
+        ggplot2::aes(
+          x = .data[[ax1]], y = .data[[ax2]],
+          fill = .data$..fill_hex, color = .data[[group_col]]
+        ),
         shape = 21, size = point_size, alpha = point_alpha, stroke = 0.6
       ) +
       ggplot2::scale_fill_identity(guide = "none") +
@@ -322,16 +352,18 @@ plot_beta_pcoa <- function(x,
       }
     }
     if ("group_time" %in% ellipse_by && has_group && has_timeF) {
-      for (g in group_levels) for (tlev in time_levels) {
-        dsub <- df[df[[group_col]] == g & df[[time_fac]] == tlev, , drop = FALSE]
-        if (nrow(dsub) < 3) next
-        p <- p + ggplot2::stat_ellipse(
-          data = dsub,
-          ggplot2::aes(x = .data[[ax1]], y = .data[[ax2]]),
-          type = ellipse_type, level = ellipse_level,
-          linewidth = 0.5, alpha = 0.7, color = base_map[[g]],
-          show.legend = FALSE
-        )
+      for (g in group_levels) {
+        for (tlev in time_levels) {
+          dsub <- df[df[[group_col]] == g & df[[time_fac]] == tlev, , drop = FALSE]
+          if (nrow(dsub) < 3) next
+          p <- p + ggplot2::stat_ellipse(
+            data = dsub,
+            ggplot2::aes(x = .data[[ax1]], y = .data[[ax2]]),
+            type = ellipse_type, level = ellipse_level,
+            linewidth = 0.5, alpha = 0.7, color = base_map[[g]],
+            show.legend = FALSE
+          )
+        }
       }
     }
   }
@@ -395,18 +427,18 @@ plot_beta_pcoa <- function(x,
       if (nrow(bp)) {
         bp$term <- rownames(bp)
         if (has_timeF) {
-          bp <- bp[ grepl("^group", bp$term) |
-                      grepl("^time_", bp$term) |
-                      grepl(":time_", bp$term), , drop = FALSE]
+          bp <- bp[grepl("^group", bp$term) |
+            grepl("^time_", bp$term) |
+            grepl(":time_", bp$term), , drop = FALSE]
         } else {
-          bp <- bp[ grepl("^group", bp$term) |
-                      grepl("time_cont$", bp$term) |
-                      grepl(":time_cont$", bp$term), , drop = FALSE]
+          bp <- bp[grepl("^group", bp$term) |
+            grepl("time_cont$", bp$term) |
+            grepl(":time_cont$", bp$term), , drop = FALSE]
         }
         if (nrow(bp)) {
           sites <- as.data.frame(vegan::scores(cap_fit, display = "sites", choices = axes))
           max_site <- max(abs(unlist(sites[, 1:2])), na.rm = TRUE)
-          max_bp   <- max(abs(unlist(bp[, 1:2])), na.rm = TRUE)
+          max_bp <- max(abs(unlist(bp[, 1:2])), na.rm = TRUE)
           scl <- if (is.finite(max_site) && is.finite(max_bp) && max_bp > 0) 0.95 * max_site / max_bp else 1
           bp$X1s <- bp[[1]] * scl
           bp$X2s <- bp[[2]] * scl
@@ -457,11 +489,11 @@ plot_beta_pcoa <- function(x,
 #' p <- ph_plot_cap_axes_vs_time(beta_cap)
 #' print(p)
 ph_plot_cap_axes_vs_time <- function(beta,
-                                     axes        = c("CAP1", "CAP2"),
+                                     axes = c("CAP1", "CAP2"),
                                      point_alpha = 0.25,
-                                     point_size  = 1,
-                                     linewidth   = 1,
-                                     free_y      = TRUE) {
+                                     point_size = 1,
+                                     linewidth = 1,
+                                     free_y = TRUE) {
   .ph_with_timing("CAP: axes vs time", {
     # --- sanity checks -------------------------------------------------
     if (!inherits(beta, "phip_beta_diversity")) {
@@ -496,21 +528,26 @@ ph_plot_cap_axes_vs_time <- function(beta,
     # --- data prep -----------------------------------------------------
     df_long <- pcoa |>
       dplyr::select(dplyr::all_of(c("sample_id", "group", "time_cont", axes))) |>
-      tidyr::pivot_longer(cols = dplyr::all_of(axes),
-                          names_to = "axis",
-                          values_to = "score")
+      tidyr::pivot_longer(
+        cols = dplyr::all_of(axes),
+        names_to = "axis",
+        values_to = "score"
+      )
 
     .ph_log_info("Fitting LM smooths per group & axis",
-                 step = "CAP_axes_vs_time",
-                 bullets = sprintf("n = %s rows; axes = %s",
-                                   format(nrow(df_long), big.mark = "'"),
-                                   paste(axes, collapse = ", ")))
+      step = "CAP_axes_vs_time",
+      bullets = sprintf(
+        "n = %s rows; axes = %s",
+        format(nrow(df_long), big.mark = "'"),
+        paste(axes, collapse = ", ")
+      )
+    )
 
     # --- plot ----------------------------------------------------------
     p <- ggplot2::ggplot(df_long, ggplot2::aes(time_cont, score, color = group)) +
       ggplot2::geom_point(alpha = point_alpha, size = point_size) +
       ggplot2::geom_smooth(method = "lm", se = FALSE, linewidth = linewidth) +
-      ggplot2::facet_wrap(~ axis, scales = if (isTRUE(free_y)) "free_y" else "fixed") +
+      ggplot2::facet_wrap(~axis, scales = if (isTRUE(free_y)) "free_y" else "fixed") +
       scale_color_phip(name = "group") +
       ggplot2::labs(
         title = "CAP (constrained) axes vs time",
@@ -540,8 +577,8 @@ ph_plot_cap_axes_vs_time <- function(beta,
 #' print(p)
 ph_plot_dispersion_vs_time <- function(beta,
                                        point_alpha = 0.25,
-                                       point_size  = 1.2,
-                                       linewidth   = 1) {
+                                       point_size = 1.2,
+                                       linewidth = 1) {
   .ph_with_timing("CAP: dispersion vs time", {
     # --- sanity checks -------------------------------------------------
     if (!inherits(beta, "phip_beta_diversity")) {
@@ -587,8 +624,9 @@ ph_plot_dispersion_vs_time <- function(beta,
     }
 
     .ph_log_info("Fitting LM smooths per group",
-                 step = "dispersion_vs_time",
-                 bullets = sprintf("n = %s rows", format(nrow(disp2), big.mark = "'")))
+      step = "dispersion_vs_time",
+      bullets = sprintf("n = %s rows", format(nrow(disp2), big.mark = "'"))
+    )
 
     # --- plot ----------------------------------------------------------
     p <- ggplot2::ggplot(disp2, ggplot2::aes(time_cont, distance, color = group)) +
@@ -631,16 +669,16 @@ ph_plot_dispersion_vs_time <- function(beta,
 #' p <- ph_plot_dispersion_box(beta_cap)
 #' print(p)
 ph_plot_dispersion_box <- function(beta,
-                                   view             = attr(beta, "group_cols") %||% "big_group",
-                                   scope_filter     = "group",
-                                   contrast_filter  = "<global>",
-                                   sig_level        = 0.05,
-                                   label_format     = "p.format",
-                                   custom_colors    = NULL,
-                                   show_points      = TRUE,
-                                   point_alpha      = 0.30,
-                                   point_size       = 1,
-                                   rotate_x         = TRUE) {
+                                   view = attr(beta, "group_cols") %||% "big_group",
+                                   scope_filter = "group",
+                                   contrast_filter = "<global>",
+                                   sig_level = 0.05,
+                                   label_format = "p.format",
+                                   custom_colors = NULL,
+                                   show_points = TRUE,
+                                   point_alpha = 0.30,
+                                   point_size = 1,
+                                   rotate_x = TRUE) {
   .ph_with_timing("Dispersion boxplots", {
     # --- checks --------------------------------------------------------
     if (!inherits(beta, "phip_beta_diversity")) {
@@ -709,29 +747,39 @@ ph_plot_dispersion_box <- function(beta,
 
     # compute Wilcoxon for each pair and keep significant
     sig_comparisons <- purrr::keep(pairwise_comparisons, function(pair) {
-      g1 <- pair[1]; g2 <- pair[2]
-      x  <- disp2 |> dplyr::filter(!!grp_sym == g1) |> dplyr::pull(.data$distance)
-      y  <- disp2 |> dplyr::filter(!!grp_sym == g2) |> dplyr::pull(.data$distance)
-      if (!length(x) || !length(y)) return(FALSE)
+      g1 <- pair[1]
+      g2 <- pair[2]
+      x <- disp2 |>
+        dplyr::filter(!!grp_sym == g1) |>
+        dplyr::pull(.data$distance)
+      y <- disp2 |>
+        dplyr::filter(!!grp_sym == g2) |>
+        dplyr::pull(.data$distance)
+      if (!length(x) || !length(y)) {
+        return(FALSE)
+      }
       stats::wilcox.test(x, y, exact = FALSE)$p.value < sig_level
     })
 
     .ph_log_info("Pairwise Wilcoxon tests",
-                 step = "dispersion_box",
-                 bullets = c(
-                   paste("view:", view, "| component:", hit),
-                   paste("groups:", paste(groups_present, collapse = ", ")),
-                   paste("n rows:", nrow(disp2)),
-                   paste("significant pairs:", length(sig_comparisons))
-                 ))
+      step = "dispersion_box",
+      bullets = c(
+        paste("view:", view, "| component:", hit),
+        paste("groups:", paste(groups_present, collapse = ", ")),
+        paste("n rows:", nrow(disp2)),
+        paste("significant pairs:", length(sig_comparisons))
+      )
+    )
 
     # --- plot ----------------------------------------------------------
     p <- ggplot2::ggplot(disp2, ggplot2::aes(x = !!grp_sym, y = .data$distance, fill = !!grp_sym)) +
       ggplot2::geom_boxplot(show.legend = FALSE, outlier.shape = NA)
 
     if (isTRUE(show_points)) {
-      p <- p + ggplot2::geom_jitter(color = "black", size = point_size, width = 0.2,
-                                    alpha = point_alpha, show.legend = FALSE)
+      p <- p + ggplot2::geom_jitter(
+        color = "black", size = point_size, width = 0.2,
+        alpha = point_alpha, show.legend = FALSE
+      )
     }
 
     if (!is.null(custom_colors)) {
@@ -746,8 +794,10 @@ ph_plot_dispersion_box <- function(beta,
       ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.1))) +
       ggplot2::labs(
         title = "Dispersion by group",
-        subtitle = sprintf("Distance to group centroid · view = %s · scope = %s · contrast = %s",
-                           view, scope_filter, contrast_filter),
+        subtitle = sprintf(
+          "Distance to group centroid · view = %s · scope = %s · contrast = %s",
+          view, scope_filter, contrast_filter
+        ),
         x = "Group",
         y = "Distance to centroid"
       ) +

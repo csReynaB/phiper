@@ -48,8 +48,10 @@
 #' @examples
 #' \dontrun{
 #' # phip_data input
-#' plot_enrichment_counts(pd, group_cols = "Cohort",
-#'                        prevalence_threshold = 0.05)
+#' plot_enrichment_counts(pd,
+#'   group_cols = "Cohort",
+#'   prevalence_threshold = 0.05
+#' )
 #'
 #' # no facets (aggregate over all samples)
 #' plot_enrichment_counts(pd, group_cols = NULL)
@@ -98,7 +100,6 @@ plot_enrichment_counts <- function(phip_data,
       sprintf("grouping variable: '%s'", group_col)
     },
     expr = {
-
       # ---- 0) sanity checks --------------------------------------------------
       need <- c("sample_id", "peptide_id", "exist")
       if (!is.null(group_col)) need <- c(need, group_col)
@@ -106,9 +107,11 @@ plot_enrichment_counts <- function(phip_data,
       if (length(miss)) {
         .ph_abort(
           headline = "Missing required columns for plotting.",
-          step     = "input validation",
-          bullets  = sprintf("missing: %s",
-                             paste(add_quotes(miss, 1L), collapse = ", "))
+          step = "input validation",
+          bullets = sprintf(
+            "missing: %s",
+            paste(add_quotes(miss, 1L), collapse = ", ")
+          )
         )
       }
 
@@ -151,8 +154,10 @@ plot_enrichment_counts <- function(phip_data,
       # the number of unique subject x timepoint combos !!!!
       pep_counts <- tbl_present |>
         dplyr::group_by(.data$Cohort, .data$peptide_id) |>
-        dplyr::summarise(n_present = dplyr::n_distinct(.data$sample_id),
-                         .groups = "drop") |>
+        dplyr::summarise(
+          n_present = dplyr::n_distinct(.data$sample_id),
+          .groups = "drop"
+        ) |>
         dplyr::filter(.data$n_present > 0) |>
         dplyr::collect()
 
@@ -164,16 +169,20 @@ plot_enrichment_counts <- function(phip_data,
       # calculate how many peptides above/below treshold
       n_thresh_tbl <- pep_counts |>
         dplyr::inner_join(dplyr::select(thresholds, .data$Cohort, .data$thresh),
-                          by = "Cohort") |>
+          by = "Cohort"
+        ) |>
         dplyr::group_by(.data$Cohort) |>
         dplyr::summarise(
           n_peptides_thresh = sum(.data$n_present >= .data$thresh),
-          .groups = "drop")
+          .groups = "drop"
+        )
 
       overall_tbl <- pep_counts |>
         dplyr::group_by(.data$Cohort) |>
-        dplyr::summarise(n_overall = dplyr::n_distinct(.data$peptide_id),
-                         .groups = "drop")
+        dplyr::summarise(
+          n_overall = dplyr::n_distinct(.data$peptide_id),
+          .groups = "drop"
+        )
 
       # build the table for plotting
       thresholds_df <- thresholds |>
@@ -206,14 +215,18 @@ plot_enrichment_counts <- function(phip_data,
       }
 
       count_df <- dplyr::mutate(count_df,
-                                fill_col = unname(pal_map[
-                                  as.character(.data$Cohort)]))
+        fill_col = unname(pal_map[
+          as.character(.data$Cohort)
+        ])
+      )
 
       # ---- 6) plot -----------------------------------------------------------
       label_size <- 4
 
-      p <- ggplot2::ggplot(count_df, ggplot2::aes(x = .data$n_present,
-                                                  fill = .data$fill_col)) +
+      p <- ggplot2::ggplot(count_df, ggplot2::aes(
+        x = .data$n_present,
+        fill = .data$fill_col
+      )) +
         ggplot2::geom_histogram(
           binwidth = binwidth,
           position = "identity",
@@ -225,8 +238,10 @@ plot_enrichment_counts <- function(phip_data,
           labels = scales::trans_format("log10", scales::math_format(10^.x)),
           expand = ggplot2::expansion(mult = c(0, .15))
         ) +
-        ggplot2::annotation_logticks(sides = "l",
-                                     scaled = TRUE) +
+        ggplot2::annotation_logticks(
+          sides = "l",
+          scaled = TRUE
+        ) +
         ggplot2::scale_fill_identity(guide = "none") +
         ggplot2::labs(
           x = "# of observations",
@@ -234,10 +249,12 @@ plot_enrichment_counts <- function(phip_data,
         ) +
         ggplot2::geom_segment(
           data = thresholds_df,
-          ggplot2::aes(x = .data$thresh,
-                       xend = .data$n_samples,
-                       y = .data$y_line,
-                       yend = .data$y_line),
+          ggplot2::aes(
+            x = .data$thresh,
+            xend = .data$n_samples,
+            y = .data$y_line,
+            yend = .data$y_line
+          ),
           inherit.aes = FALSE,
           linetype = "dashed",
           color = "black",
@@ -249,9 +266,11 @@ plot_enrichment_counts <- function(phip_data,
           ggplot2::aes(
             x = .data$x_mid,
             y = .data$y_line,
-            label = paste0(.data$n_peptides_thresh,
-                           " peptides in ≥",
-                           round(prevalence_threshold * 100), "%")
+            label = paste0(
+              .data$n_peptides_thresh,
+              " peptides in ≥",
+              round(prevalence_threshold * 100), "%"
+            )
           ),
           inherit.aes = FALSE,
           vjust = -0.6,
@@ -310,23 +329,32 @@ plot_enrichment_counts.phip_data <- function(phip_data,
   # timing for logs
   .ph_with_timing(
     headline = "Plotting enrichment counts (<phip_data>)",
-    step     = if (is.null(group_cols)) "group_cols: <none>" else
+    step = if (is.null(group_cols)) {
+      "group_cols: <none>"
+    } else {
       sprintf("group_cols: %s", paste(add_quotes(group_cols, 1L),
-                                      collapse = ", ")),
+        collapse = ", "
+      ))
+    },
     expr = {
       # extract data_long
       tbl <- x$data_long
 
       ## prune introduced zeros if we know we're on a full-cross ---------------
       if (isTRUE(x$meta$full_cross) && ("exist" %in% colnames(tbl))) {
-        red_txt <- tryCatch({
-          ep <- as.numeric(x$meta$exist_prop)
-          if (is.finite(ep) && ep > 0) sprintf("~%.1fx", 1/ep) else "<unknown>"
-        }, error = function(e) "<unknown>")
+        red_txt <- tryCatch(
+          {
+            ep <- as.numeric(x$meta$exist_prop)
+            if (is.finite(ep) && ep > 0) sprintf("~%.1fx", 1 / ep) else "<unknown>"
+          },
+          error = function(e) "<unknown>"
+        )
         .ph_log_info(
           "Full-cross detected; pruning non-existing rows before plotting",
-          bullets = c("rule: keep exist == 1",
-                      sprintf("estimated reduction: %s", red_txt))
+          bullets = c(
+            "rule: keep exist == 1",
+            sprintf("estimated reduction: %s", red_txt)
+          )
         )
         tbl <- dplyr::filter(tbl, .data$exist == 1L)
       }
@@ -337,10 +365,13 @@ plot_enrichment_counts.phip_data <- function(phip_data,
         if (length(missing_gcs)) {
           .ph_abort(
             headline = "Missing grouping columns in data_long.",
-            step     = "input validation",
-            bullets  = sprintf("missing: %s",
-                               paste(add_quotes(missing_gcs, 1L),
-                                     collapse = ", "))
+            step = "input validation",
+            bullets = sprintf(
+              "missing: %s",
+              paste(add_quotes(missing_gcs, 1L),
+                collapse = ", "
+              )
+            )
           )
         }
       }
@@ -371,11 +402,12 @@ plot_enrichment_counts.phip_data <- function(phip_data,
 
         # optional: interaction plot across ALL provided group_cols
         if (isTRUE(group_interaction) && length(group_cols) >= 2L) {
-          combo_nm  <- paste(group_cols, collapse = interaction_sep)
+          combo_nm <- paste(group_cols, collapse = interaction_sep)
           inter_col <- "..phip_interaction.."
           tbl_inter <- dplyr::mutate(tbl, !!rlang::sym(inter_col) :=
-                                       paste(!!!rlang::syms(group_cols),
-                                             sep = interaction_sep))
+            paste(!!!rlang::syms(group_cols),
+              sep = interaction_sep
+            ))
 
           plots[[combo_nm]] <- .plot_enrichment_counts_one(
             tbl_inter,
@@ -423,9 +455,10 @@ plot_enrichment_counts.data.frame <- function(phip_data,
     headline = "Plotting enrichment counts (data.frame)",
     step = if (is.null(group_cols)) {
       "group_cols: <none>"
-    } else{
+    } else {
       sprintf("group_cols: %s", paste(add_quotes(group_cols, 1L),
-                                      collapse = ", "))
+        collapse = ", "
+      ))
     },
     expr = {
       ## minimal checks
@@ -434,10 +467,13 @@ plot_enrichment_counts.data.frame <- function(phip_data,
       if (length(miss_base)) {
         .ph_abort(
           headline = "Missing required columns in data.frame.",
-          step     = "input validation",
-          bullets  = sprintf("missing: %s",
-                             paste(add_quotes(miss_base, 1L),
-                                   collapse = ", "))
+          step = "input validation",
+          bullets = sprintf(
+            "missing: %s",
+            paste(add_quotes(miss_base, 1L),
+              collapse = ", "
+            )
+          )
         )
       }
 
@@ -476,8 +512,9 @@ plot_enrichment_counts.data.frame <- function(phip_data,
           combo_nm <- paste(group_cols, collapse = interaction_sep)
           inter_col <- "..phip_interaction.."
           tbl_inter <- dplyr::mutate(tbl, !!rlang::sym(inter_col) :=
-                                       paste(!!!rlang::syms(group_cols),
-                                             sep = interaction_sep))
+            paste(!!!rlang::syms(group_cols),
+              sep = interaction_sep
+            ))
 
           plots[[combo_nm]] <- .plot_enrichment_counts_one(
             tbl_inter,
@@ -559,8 +596,8 @@ plot_enrichment_counts.data.frame <- function(phip_data,
 #'
 #' # Use ranks present in the peptide library (e.g., lineage/taxa)
 #' out_taxa <- compute_alpha_diversity(pd,
-#'   group_cols = c("Cohort","timepoint"),
-#'   ranks = c("peptide_id","family","genus"),
+#'   group_cols = c("Cohort", "timepoint"),
+#'   ranks = c("peptide_id", "family", "genus"),
 #'   group_interaction = TRUE
 #' )
 #'
@@ -585,12 +622,12 @@ compute_alpha_diversity <- function(x, ...) UseMethod("compute_alpha_diversity")
 # ------------------------------------------------------------------------------
 
 # natural->base-b change factor for Shannon (H_b = H_ln / ln(b))
-.phip_ln_base <- function(shannon_log = c("ln","log2","log10")) {
+.phip_ln_base <- function(shannon_log = c("ln", "log2", "log10")) {
   shannon_log <- match.arg(shannon_log)
   switch(shannon_log,
-         ln    = 1.0,
-         log2  = log(2),
-         log10 = log(10)
+    ln    = 1.0,
+    log2  = log(2),
+    log10 = log(10)
   )
 }
 
@@ -604,7 +641,7 @@ compute_alpha_diversity <- function(x, ...) UseMethod("compute_alpha_diversity")
                                      group_col = NULL,
                                      ranks,
                                      fc_threshold = NULL,
-                                     shannon_log = c("ln","log2","log10"),
+                                     shannon_log = c("ln", "log2", "log10"),
                                      carry_cols = NULL,
                                      map_provider) {
   # clean eval and helpers
@@ -615,14 +652,15 @@ compute_alpha_diversity <- function(x, ...) UseMethod("compute_alpha_diversity")
   # ---- validate required columns ---------------------------------------------
   need <- c("sample_id", "peptide_id", "exist")
   if (!is.null(fc_threshold)) need <- union(need, "fold_change")
-  if (!is.null(group_col))    need <- union(need, group_col)
+  if (!is.null(group_col)) need <- union(need, group_col)
   miss <- setdiff(need, colnames(tbl))
   if (length(miss)) {
     .ph_abort(
       headline = "Missing required columns.",
-      step     = "input validation",
-      bullets  = sprintf("missing: %s", paste(add_quotes(miss, 1L),
-                                              collapse = ", "))
+      step = "input validation",
+      bullets = sprintf("missing: %s", paste(add_quotes(miss, 1L),
+        collapse = ", "
+      ))
     )
   }
 
@@ -642,9 +680,11 @@ compute_alpha_diversity <- function(x, ...) UseMethod("compute_alpha_diversity")
 
   # distinct present tuples
   pres_min <- pres_tbl |>
-    dplyr::transmute(sample_id = .data$sample_id,
-                     peptide_id = .data$peptide_id,
-                     cohort     = .data$cohort) |>
+    dplyr::transmute(
+      sample_id = .data$sample_id,
+      peptide_id = .data$peptide_id,
+      cohort = .data$cohort
+    ) |>
     dplyr::distinct()
 
   # ---- each rank must be an exact column name --------------------------------
@@ -668,7 +708,9 @@ compute_alpha_diversity <- function(x, ...) UseMethod("compute_alpha_diversity")
     } else {
       # obtain (peptide_id, rank_val) mapping lazily on the same connection
       map_tbl <- map_provider(rank_name)
-      if (is.null(map_tbl)) return(NULL)  # already warned upstream
+      if (is.null(map_tbl)) {
+        return(NULL)
+      } # already warned upstream
 
       # join & keep non-missing rank values
       ranked <- pres_min |>
@@ -689,9 +731,15 @@ compute_alpha_diversity <- function(x, ...) UseMethod("compute_alpha_diversity")
         dplyr::group_by(sample_id, cohort) |>
         dplyr::summarise(
           richness = dplyr::n_distinct(rank_val),
-          H_ln     = { p <- n / sum(n); -sum(p * log(p)) },
-          simpson  = { p <- n / sum(n); 1 - sum(p * p) },
-          .groups  = "drop"
+          H_ln = {
+            p <- n / sum(n)
+            -sum(p * log(p))
+          },
+          simpson = {
+            p <- n / sum(n)
+            1 - sum(p * p)
+          },
+          .groups = "drop"
         ) |>
         dplyr::mutate(shannon = H_ln / ln_base) |>
         dplyr::select(-H_ln)
@@ -722,8 +770,10 @@ compute_alpha_diversity <- function(x, ...) UseMethod("compute_alpha_diversity")
     norm <- function(x) gsub("[^a-z0-9]+", "_", tolower(x))
     names(out) <- norm(names(out))
     out |>
-      dplyr::rename(shannon_diversity = shannon,
-                    simpson_diversity = simpson)
+      dplyr::rename(
+        shannon_diversity = shannon,
+        simpson_diversity = simpson
+      )
   }
 
 
@@ -749,9 +799,11 @@ compute_alpha_diversity.phip_data <- function(x,
                                               group_cols = NULL,
                                               ranks = "peptide_id",
                                               fc_threshold = NULL,
-                                              shannon_log = c("ln",
-                                                              "log2",
-                                                              "log10"),
+                                              shannon_log = c(
+                                                "ln",
+                                                "log2",
+                                                "log10"
+                                              ),
                                               carry_cols = NULL,
                                               group_interaction = FALSE,
                                               interaction_sep = " * ") {
@@ -762,7 +814,7 @@ compute_alpha_diversity.phip_data <- function(x,
   # log time
   .ph_with_timing(
     headline = "Computing alpha diversity (<phip_data>)",
-    step     = paste0(
+    step = paste0(
       "group_cols: ", if (is.null(group_cols)) {
         "<none>"
       } else {
@@ -776,10 +828,13 @@ compute_alpha_diversity.phip_data <- function(x,
       ## if we’re working on a full-cross, prune introduced zeros upfront
       if (isTRUE(x$meta$full_cross) && ("exist" %in% colnames(tbl))) {
         # estimate reduction factor if we know exist_prop
-        red_txt <- tryCatch({
-          ep <- as.numeric(x$meta$exist_prop)
-          if (is.finite(ep) && ep > 0) sprintf("~%.1fx", 1/ep) else "<unknown>"
-        }, error = function(e) "<unknown>")
+        red_txt <- tryCatch(
+          {
+            ep <- as.numeric(x$meta$exist_prop)
+            if (is.finite(ep) && ep > 0) sprintf("~%.1fx", 1 / ep) else "<unknown>"
+          },
+          error = function(e) "<unknown>"
+        )
 
         .ph_log_info(
           "Full-cross detected; pruning non-existing rows before alpha calc",
@@ -798,28 +853,31 @@ compute_alpha_diversity.phip_data <- function(x,
         if (length(miss_gc)) {
           .ph_abort(
             headline = "Grouping columns not found in data_long.",
-            step     = "input validation",
-            bullets  = sprintf("missing: %s", paste(add_quotes(miss_gc, 1L),
-                                                    collapse = ", "))
+            step = "input validation",
+            bullets = sprintf("missing: %s", paste(add_quotes(miss_gc, 1L),
+              collapse = ", "
+            ))
           )
         }
       }
 
       # peptide-library rank availability (must include ranks) --> extract it
       # from the Vogl's lab peptide library by default
-      peplib_main <- .ensure_peplib_on_main(x)  # <- (lazy tbl on main con)
+      peplib_main <- .ensure_peplib_on_main(x) # <- (lazy tbl on main con)
       peplib_cols <- colnames(peplib_main)
 
       .ph_log_info(
         "Peptide library attached on main connection",
         bullets = c(
-          sprintf("available columns: %s%s",
-                  paste(utils::head(peplib_cols, 8), collapse = ", "),
-                  if (length(peplib_cols) > 8) {
-                    sprintf(" …(+%d)", length(peplib_cols) - 8)
-                  } else {
-                    ""
-                  })
+          sprintf(
+            "available columns: %s%s",
+            paste(utils::head(peplib_cols, 8), collapse = ", "),
+            if (length(peplib_cols) > 8) {
+              sprintf(" …(+%d)", length(peplib_cols) - 8)
+            } else {
+              ""
+            }
+          )
         )
       )
 
@@ -845,7 +903,8 @@ compute_alpha_diversity.phip_data <- function(x,
       if (is.null(group_cols) || !length(group_cols)) {
         out_list[["all_samples"]] <-
           .compute_alpha_for_group(
-            tbl, group_col = NULL, ranks = ranks,
+            tbl,
+            group_col = NULL, ranks = ranks,
             fc_threshold = fc_threshold, shannon_log = shannon_log,
             carry_cols = carry_cols, map_provider = map_provider
           )
@@ -853,20 +912,23 @@ compute_alpha_diversity.phip_data <- function(x,
         for (gc in group_cols) {
           out_list[[gc]] <-
             .compute_alpha_for_group(
-              tbl, group_col = gc, ranks = ranks,
+              tbl,
+              group_col = gc, ranks = ranks,
               fc_threshold = fc_threshold, shannon_log = shannon_log,
               carry_cols = carry_cols, map_provider = map_provider
             )
         }
         if (isTRUE(group_interaction) && length(group_cols) >= 2L) {
           inter_col <- "..phip_interaction.."
-          combo_nm  <- paste(group_cols, collapse = interaction_sep)
+          combo_nm <- paste(group_cols, collapse = interaction_sep)
           tbl_inter <- dplyr::mutate(tbl, !!rlang::sym(inter_col) :=
-                                       paste(!!!rlang::syms(group_cols),
-                                             sep = interaction_sep))
+            paste(!!!rlang::syms(group_cols),
+              sep = interaction_sep
+            ))
           out_list[[combo_nm]] <-
             .compute_alpha_for_group(
-              tbl_inter, group_col = inter_col, ranks = ranks,
+              tbl_inter,
+              group_col = inter_col, ranks = ranks,
               fc_threshold = fc_threshold, shannon_log = shannon_log,
               carry_cols = carry_cols, map_provider = map_provider
             )
@@ -876,10 +938,10 @@ compute_alpha_diversity.phip_data <- function(x,
       # Tag output with S3 class + attributes for downstream plotting
       out_list <- lapply(out_list, tibble::as_tibble)
       class(out_list) <- c("phip_alpha_diversity", class(out_list))
-      attr(out_list, "group_cols")   <- group_cols
-      attr(out_list, "ranks")        <- ranks
+      attr(out_list, "group_cols") <- group_cols
+      attr(out_list, "ranks") <- ranks
       attr(out_list, "fc_threshold") <- fc_threshold
-      attr(out_list, "shannon_log")  <- match.arg(shannon_log)
+      attr(out_list, "shannon_log") <- match.arg(shannon_log)
 
       out_list
     },
@@ -897,9 +959,11 @@ compute_alpha_diversity.data.frame <- function(x,
                                                group_cols = NULL,
                                                ranks = "peptide_id",
                                                fc_threshold = NULL,
-                                               shannon_log = c("ln",
-                                                               "log2",
-                                                               "log10"),
+                                               shannon_log = c(
+                                                 "ln",
+                                                 "log2",
+                                                 "log10"
+                                               ),
                                                carry_cols = NULL,
                                                group_interaction = FALSE,
                                                interaction_sep = " * ") {
@@ -910,7 +974,7 @@ compute_alpha_diversity.data.frame <- function(x,
   # timing as always
   .ph_with_timing(
     headline = "Computing alpha diversity (data.frame)",
-    step     = paste0(
+    step = paste0(
       "group_cols: ", if (is.null(group_cols)) {
         "<none>"
       } else {
@@ -925,9 +989,10 @@ compute_alpha_diversity.data.frame <- function(x,
         if (length(miss_gc)) {
           .ph_abort(
             headline = "Grouping columns not found in data.frame.",
-            step     = "input validation",
-            bullets  = sprintf("missing: %s", paste(add_quotes(miss_gc, 1L),
-                                                    collapse = ", "))
+            step = "input validation",
+            bullets = sprintf("missing: %s", paste(add_quotes(miss_gc, 1L),
+              collapse = ", "
+            ))
           )
         }
       }
@@ -957,7 +1022,8 @@ compute_alpha_diversity.data.frame <- function(x,
       if (is.null(group_cols) || !length(group_cols)) {
         out_list[["all_samples"]] <-
           .compute_alpha_for_group(
-            tbl, group_col = NULL, ranks = ranks,
+            tbl,
+            group_col = NULL, ranks = ranks,
             fc_threshold = fc_threshold, shannon_log = shannon_log,
             carry_cols = carry_cols, map_provider = map_provider
           )
@@ -965,20 +1031,23 @@ compute_alpha_diversity.data.frame <- function(x,
         for (gc in group_cols) {
           out_list[[gc]] <-
             .compute_alpha_for_group(
-              tbl, group_col = gc, ranks = ranks,
+              tbl,
+              group_col = gc, ranks = ranks,
               fc_threshold = fc_threshold, shannon_log = shannon_log,
               carry_cols = carry_cols, map_provider = map_provider
             )
         }
         if (isTRUE(group_interaction) && length(group_cols) >= 2L) {
           inter_col <- "..phip_interaction.."
-          combo_nm  <- paste(group_cols, collapse = interaction_sep)
+          combo_nm <- paste(group_cols, collapse = interaction_sep)
           tbl_inter <- dplyr::mutate(tbl, !!rlang::sym(inter_col) :=
-                                       paste(!!!rlang::syms(group_cols),
-                                             sep = interaction_sep))
+            paste(!!!rlang::syms(group_cols),
+              sep = interaction_sep
+            ))
           out_list[[combo_nm]] <-
             .compute_alpha_for_group(
-              tbl_inter, group_col = inter_col, ranks = ranks,
+              tbl_inter,
+              group_col = inter_col, ranks = ranks,
               fc_threshold = fc_threshold, shannon_log = shannon_log,
               carry_cols = carry_cols, map_provider = map_provider
             )
@@ -987,10 +1056,10 @@ compute_alpha_diversity.data.frame <- function(x,
 
       out_list <- lapply(out_list, tibble::as_tibble)
       class(out_list) <- c("phip_alpha_diversity", class(out_list))
-      attr(out_list, "group_cols")     <- group_cols
-      attr(out_list, "ranks")          <- ranks
-      attr(out_list, "fc_threshold")   <- fc_threshold
-      attr(out_list, "shannon_log")    <- match.arg(shannon_log)
+      attr(out_list, "group_cols") <- group_cols
+      attr(out_list, "ranks") <- ranks
+      attr(out_list, "fc_threshold") <- fc_threshold
+      attr(out_list, "shannon_log") <- match.arg(shannon_log)
 
       out_list
     },
@@ -1097,7 +1166,9 @@ plot_alpha_diversity <- function(x, ...) {
 .norm_metric <- function(metric) {
   allowed <- c("richness", "shannon_diversity", "simpson_diversity")
   key <- tolower(metric[1])
-  if (key %in% allowed) return(key)
+  if (key %in% allowed) {
+    return(key)
+  }
   .ph_abort(
     headline = "Unknown metric.",
     step     = "argument validation",
@@ -1110,7 +1181,7 @@ plot_alpha_diversity <- function(x, ...) {
 # to 9 and your data has only 3 unique timepoints) --> take the maximal allowed
 # value then
 .safe_k <- function(x, k_req) {
-  n_ux  <- length(unique(stats::na.omit(x)))
+  n_ux <- length(unique(stats::na.omit(x)))
   k_eff <- max(3L, min(as.integer(k_req), as.integer(n_ux) - 1L))
   if (!is.finite(k_eff) || k_eff < 3L) 3L else k_eff
 }
@@ -1125,7 +1196,7 @@ plot_alpha_diversity <- function(x, ...) {
                           nonneg = FALSE) {
   # extract the variable and get the x-grid to smooth/predict on
   x <- d[[xvar]]
-  rng   <- range(x, na.rm = TRUE)
+  rng <- range(x, na.rm = TRUE)
   xgrid <- if (rng[1] == rng[2]) {
     sort(unique(x))
   } else {
@@ -1133,30 +1204,36 @@ plot_alpha_diversity <- function(x, ...) {
   }
 
   k_eff <- .safe_k(x, k_req) # previous wrapper to get the number of k
-  form  <- stats::as.formula(paste(yvar,
-                                   "~ s(",
-                                   xvar,
-                                   ", k = ",
-                                   k_eff,
-                                   ")", sep = ""))
+  form <- stats::as.formula(paste(yvar,
+    "~ s(",
+    xvar,
+    ", k = ",
+    k_eff,
+    ")",
+    sep = ""
+  ))
 
-  fit  <- mgcv::gam(form, data = d)  # workhorse --> fits gam
-  nd   <- data.frame(xgrid); names(nd) <- xvar # for the model predictions
+  fit <- mgcv::gam(form, data = d) # workhorse --> fits gam
+  nd <- data.frame(xgrid)
+  names(nd) <- xvar # for the model predictions
 
   ## get the smoothed gam curve
-  pr   <- mgcv::predict.gam(fit, newdata = nd, type = "response", se.fit = TRUE)
+  pr <- mgcv::predict.gam(fit, newdata = nd, type = "response", se.fit = TRUE)
 
   # extract upper/lower bands and the mean (actual prediction --> BLUP)
-  z   <- stats::qnorm(1 - (1 - level) / 2)
-  mu  <- as.numeric(pr$fit)
-  se  <- as.numeric(pr$se.fit)
+  z <- stats::qnorm(1 - (1 - level) / 2)
+  mu <- as.numeric(pr$fit)
+  se <- as.numeric(pr$se.fit)
   lwr <- mu - z * se
   upr <- mu + z * se
 
   # when nonneg=TRUE, do not allow mu or lower band to go below 0; it doesnt
   # actually make sense for the predictions or bands for count data to be below
   # 0; counts are measured on an absolute scale
-  if (isTRUE(nonneg)) { mu <- pmax(mu, 0); lwr <- pmax(lwr, 0) }
+  if (isTRUE(nonneg)) {
+    mu <- pmax(mu, 0)
+    lwr <- pmax(lwr, 0)
+  }
 
   tibble::tibble(.x = nd[[xvar]], .y = mu, lwr = lwr, upr = upr, .k = k_eff)
 }
@@ -1176,17 +1253,19 @@ plot_alpha_diversity <- function(x, ...) {
   if (!is.null(seed)) set.seed(seed)
 
   # use the previous gam-helper to get the BLUPs, grids and meta
-  ctr  <- .gam_band_one(d, xvar, yvar, k_req = k_req, level = 0.95,
-                        nonneg = nonneg)
+  ctr <- .gam_band_one(d, xvar, yvar,
+    k_req = k_req, level = 0.95,
+    nonneg = nonneg
+  )
   xgrid <- ctr$.x
-  mu0   <- ctr$.y
+  mu0 <- ctr$.y
 
   # setting up a template matrix for the bootstrap
   mat <- matrix(NA_real_, nrow = length(xgrid), ncol = R)
 
   # some bp can be long, so a progress bar is nice to have; maybe rewrite this
   # in the future to match the phiper logging style?
-  pb  <- if (isTRUE(progress)) {
+  pb <- if (isTRUE(progress)) {
     utils::txtProgressBar(min = 0, max = R, style = 3)
   } else {
     NULL
@@ -1196,14 +1275,17 @@ plot_alpha_diversity <- function(x, ...) {
   for (r in seq_len(R)) {
     dd <- d[sample.int(nrow(d), replace = TRUE), , drop = FALSE] # sampling
     k_eff <- .safe_k(dd[[xvar]], k_req)
-    form  <- stats::as.formula(paste(yvar, "~ s(", xvar, ", k = ", k_eff, ")",
-                                     sep = ""))
-    fit   <- try(mgcv::gam(form, data = dd), silent = TRUE) # fitting
+    form <- stats::as.formula(paste(yvar, "~ s(", xvar, ", k = ", k_eff, ")",
+      sep = ""
+    ))
+    fit <- try(mgcv::gam(form, data = dd), silent = TRUE) # fitting
     if (!inherits(fit, "try-error")) {
-      nd <- data.frame(xgrid); names(nd) <- xvar # extracting BLUPs
+      nd <- data.frame(xgrid)
+      names(nd) <- xvar # extracting BLUPs
       mat[, r] <- as.numeric(mgcv::predict.gam(fit,
-                                               newdata = nd,
-                                               type = "response"))
+        newdata = nd,
+        type = "response"
+      ))
     }
     if (!is.null(pb)) utils::setTxtProgressBar(pb, r) # update progress
   }
@@ -1212,14 +1294,20 @@ plot_alpha_diversity <- function(x, ...) {
   # get lwr/upr bands based on the quantiles defined by the user; default is
   # standard 0.95
   alpha <- 1 - level
-  lwr <- apply(mat, 1, stats::quantile, probs = alpha / 2, na.rm = TRUE,
-               type = 6)
-  upr <- apply(mat, 1, stats::quantile, probs = 1 - alpha / 2, na.rm = TRUE,
-               type = 6)
+  lwr <- apply(mat, 1, stats::quantile,
+    probs = alpha / 2, na.rm = TRUE,
+    type = 6
+  )
+  upr <- apply(mat, 1, stats::quantile,
+    probs = 1 - alpha / 2, na.rm = TRUE,
+    type = 6
+  )
   if (isTRUE(nonneg)) lwr <- pmax(lwr, 0) # dont allow negative lowers
 
-  tibble::tibble(.x = xgrid, .y = mu0, lwr = lwr, upr = upr,
-                 .k = unique(ctr$.k))
+  tibble::tibble(
+    .x = xgrid, .y = mu0, lwr = lwr, upr = upr,
+    .k = unique(ctr$.k)
+  )
 }
 
 # small helper to deal with the colors (default + customs)
@@ -1240,11 +1328,18 @@ plot_alpha_diversity <- function(x, ...) {
                                  facet_by_rank,
                                  ncol,
                                  facet_scales) {
-  if (!isTRUE(facet_by_rank)) return(p)
-  if (is.null(rank_col) || !rank_col %in% names(df)) return(p)
-  if (length(unique(df[[rank_col]])) <= 1) return(p)
+  if (!isTRUE(facet_by_rank)) {
+    return(p)
+  }
+  if (is.null(rank_col) || !rank_col %in% names(df)) {
+    return(p)
+  }
+  if (length(unique(df[[rank_col]])) <= 1) {
+    return(p)
+  }
   p + ggplot2::facet_wrap(stats::as.formula(paste("~", rank_col)),
-                          ncol = ncol, scales = facet_scales)
+    ncol = ncol, scales = facet_scales
+  )
 }
 
 # ------------------------------------------------------------------------------
@@ -1253,29 +1348,28 @@ plot_alpha_diversity <- function(x, ...) {
 .build_alpha_plot <- function(alpha_df,
                               metric,
                               group_col = "group",
-                              rank_col  = "rank",
+                              rank_col = "rank",
                               filter_groups = NULL,
-                              filter_ranks  = NULL,
+                              filter_ranks = NULL,
                               custom_colors = NULL,
                               facet_by_rank = TRUE,
                               ncol = 2,
                               facet_scales = "fixed",
                               time_col = NULL,
-                              continuous_mode = c("gam","binned","loess"),
+                              continuous_mode = c("gam", "binned", "loess"),
                               gam_k = 7,
                               point_alpha = 0.25,
-                              ci_method = c("model","bootstrap"),
-                              ci_level  = 0.95,
+                              ci_method = c("model", "bootstrap"),
+                              ci_level = 0.95,
                               boot_R = 500,
                               boot_seed = NULL,
                               boot_progress = TRUE,
                               ci_fill = "grey70",
                               ci_alpha = 0.15) {
-
   # normalize inputs
   metric_col <- .norm_metric(metric)
   continuous_mode <- match.arg(continuous_mode)
-  ci_method       <- match.arg(ci_method)
+  ci_method <- match.arg(ci_method)
 
   df <- tibble::as_tibble(alpha_df)
 
@@ -1316,14 +1410,15 @@ plot_alpha_diversity <- function(x, ...) {
   keep_cols <- keep_cols[!is.na(keep_cols)]
   if (length(keep_cols)) {
     df <- df[stats::complete.cases(df[, keep_cols, drop = FALSE]), ,
-             drop = FALSE]
+      drop = FALSE
+    ]
   }
 
   # aesthetics/labels ----------------------------------------------------------
   ylab <- switch(metric_col,
-                 "richness"          = "Richness",
-                 "shannon_diversity" = "Shannon diversity",
-                 "simpson_diversity" = "Simpson diversity (1 - \u03A3 p^2)"
+    "richness"          = "Richness",
+    "shannon_diversity" = "Shannon diversity",
+    "simpson_diversity" = "Simpson diversity (1 - \u03A3 p^2)"
   )
 
   # cross-sectional ------------------------------------------------------------
@@ -1331,16 +1426,20 @@ plot_alpha_diversity <- function(x, ...) {
     if (is.null(group_col)) {
       ## base plot
       p <- ggplot2::ggplot(df, ggplot2::aes(x = "", y = .data[[metric_col]])) +
-        ggplot2::geom_boxplot(fill = "grey70", colour = "black",
-                              outlier.shape = NA) +
+        ggplot2::geom_boxplot(
+          fill = "grey70", colour = "black",
+          outlier.shape = NA
+        ) +
         ggplot2::geom_jitter(alpha = point_alpha, width = 0.1, size = 1) +
         ggplot2::labs(x = NULL, y = ylab) +
         theme_phip() +
         ggplot2::theme(axis.text.x = ggplot2::element_blank())
 
       ## apply facets
-      p <- .maybe_facet_by_rank(p, df, rank_col, facet_by_rank, ncol,
-                                facet_scales)
+      p <- .maybe_facet_by_rank(
+        p, df, rank_col, facet_by_rank, ncol,
+        facet_scales
+      )
       return(p)
     }
 
@@ -1360,19 +1459,25 @@ plot_alpha_diversity <- function(x, ...) {
     )
 
     # plotting with group_col defined
-    p <- ggplot2::ggplot(df, ggplot2::aes(x = !!gsym, y = !!msym,
-                                          fill = !!gsym)) +
+    p <- ggplot2::ggplot(df, ggplot2::aes(
+      x = !!gsym, y = !!msym,
+      fill = !!gsym
+    )) +
       ggplot2::geom_boxplot(outlier.shape = NA, show.legend = FALSE) +
-      ggplot2::geom_jitter(color = "black", size = 1, width = 0.2,
-                           alpha = point_alpha, show.legend = FALSE) +
+      ggplot2::geom_jitter(
+        color = "black", size = 1, width = 0.2,
+        alpha = point_alpha, show.legend = FALSE
+      ) +
       ggplot2::scale_x_discrete(labels = xlab_map) +
       ggplot2::labs(x = "Group", y = ylab, fill = group_col) +
       theme_phip()
 
     # color scales and facetting
     p <- .add_phip_scales(p, custom_colors)
-    p <- .maybe_facet_by_rank(p, df, rank_col, facet_by_rank, ncol,
-                              facet_scales)
+    p <- .maybe_facet_by_rank(
+      p, df, rank_col, facet_by_rank, ncol,
+      facet_scales
+    )
     return(p)
   }
 
@@ -1383,12 +1488,14 @@ plot_alpha_diversity <- function(x, ...) {
     }
 
     # cheracter vector of columns to split by
-    split_keys <- c(group_col,
-                    if (!is.null(rank_col) && isTRUE(facet_by_rank)) {
-                      rank_col
-                    } else {
-                      NULL
-                    })
+    split_keys <- c(
+      group_col,
+      if (!is.null(rank_col) && isTRUE(facet_by_rank)) {
+        rank_col
+      } else {
+        NULL
+      }
+    )
 
     # if there's at least one split key :
     # group the data by every unique combination
@@ -1406,8 +1513,11 @@ plot_alpha_diversity <- function(x, ...) {
     # by group to get the smooths by group --> if you additionally define
     # multiple ranks, you want to split by rank x group
     .ph_log_info("Fitting GAM smooths (auto-shrinking k per series)",
-                 bullets = c(sprintf("k requested: %d", gam_k),
-                             sprintf("series: %d", length(df_split))))
+      bullets = c(
+        sprintf("k requested: %d", gam_k),
+        sprintf("series: %d", length(df_split))
+      )
+    )
 
     # workhorse of the longitudinal workflow; fits the model separately to each
     # group defined in the df_split using the previously defined helper
@@ -1416,26 +1526,30 @@ plot_alpha_diversity <- function(x, ...) {
 
       # standard, narrow model CI
       out <- if (ci_method == "model") {
-        .gam_band_one(dsub, xvar = time_col, yvar = metric_col,
-                      k_req = gam_k, level = ci_level,
-                      nonneg = (metric_col == "richness"))
+        .gam_band_one(dsub,
+          xvar = time_col, yvar = metric_col,
+          k_req = gam_k, level = ci_level,
+          nonneg = (metric_col == "richness")
+        )
       } else {
         # bootstrapped CI
-        .bootstrap_gam_one(dsub, xvar = time_col, yvar = metric_col,
-                           k_req = gam_k, R = boot_R, level = ci_level,
-                           seed = boot_seed, progress = boot_progress,
-                           nonneg = (metric_col == "richness"))
+        .bootstrap_gam_one(dsub,
+          xvar = time_col, yvar = metric_col,
+          k_req = gam_k, R = boot_R, level = ci_level,
+          seed = boot_seed, progress = boot_progress,
+          nonneg = (metric_col == "richness")
+        )
       }
       if (!is.null(group_col)) out[[group_col]] <- unique(dsub[[group_col]])
-      if (!is.null(rank_col)  && isTRUE(facet_by_rank)) {
+      if (!is.null(rank_col) && isTRUE(facet_by_rank)) {
         out[[rank_col]] <- unique(dsub[[rank_col]])
       }
       out # purrr rbinds rows
     })
 
     preds$.grp <- if (!is.null(group_col) &&
-                      !is.null(rank_col) &&
-                      isTRUE(facet_by_rank)) {
+      !is.null(rank_col) &&
+      isTRUE(facet_by_rank)) {
       # 1) if we have both a group (e.g., big_group) AND a rank facet (e.g.,
       #    genus),  combine them into one id. This prevents lines/ribbons from
       #    crossing between ranks or groups.
@@ -1455,8 +1569,10 @@ plot_alpha_diversity <- function(x, ...) {
       p <- p +
         ggplot2::geom_point(
           data = df,
-          ggplot2::aes(x = .data[[time_col]], y = .data[[metric_col]],
-                       color = .data[[group_col]]),
+          ggplot2::aes(
+            x = .data[[time_col]], y = .data[[metric_col]],
+            color = .data[[group_col]]
+          ),
           alpha = point_alpha, size = if (point_alpha > 0) 1.6 else 0
         )
     } else {
@@ -1474,8 +1590,10 @@ plot_alpha_diversity <- function(x, ...) {
     p <- p +
       ggplot2::geom_ribbon(
         data = preds,
-        ggplot2::aes(x = .data$.x, ymin = .data$lwr, ymax = .data$upr,
-                     group = .data$.grp),
+        ggplot2::aes(
+          x = .data$.x, ymin = .data$lwr, ymax = .data$upr,
+          group = .data$.grp
+        ),
         inherit.aes = FALSE, fill = ci_fill, alpha = ci_alpha, colour = NA
       ) +
       {
@@ -1483,8 +1601,10 @@ plot_alpha_diversity <- function(x, ...) {
           # apply different line colors by group
           ggplot2::geom_line(
             data = preds,
-            ggplot2::aes(x = .data$.x, y = .data$.y,
-                         color = .data[[group_col]], group = .data$.grp),
+            ggplot2::aes(
+              x = .data$.x, y = .data$.y,
+              color = .data[[group_col]], group = .data$.grp
+            ),
             linewidth = 1
           )
         } else {
@@ -1503,8 +1623,10 @@ plot_alpha_diversity <- function(x, ...) {
     if (!is.null(group_col)) p <- .add_phip_scales(p, custom_colors)
 
     # facet by rank where possible/wanted + pass args to facetter
-    p <- .maybe_facet_by_rank(p, df, rank_col, facet_by_rank, ncol,
-                              facet_scales)
+    p <- .maybe_facet_by_rank(
+      p, df, rank_col, facet_by_rank, ncol,
+      facet_scales
+    )
     return(p)
   }
 
@@ -1521,32 +1643,38 @@ plot_alpha_diversity <- function(x, ...) {
     df$.bin_mid <- rng[1] + (df$.bin + 0.5) * binwidth # calcaulate the midpoint
 
     # grouping map --> the same as up in the gam section
-    group_map <- c(if (!is.null(group_col)) group_col else NULL,
-                   if (!is.null(rank_col) && isTRUE(facet_by_rank)) {
-                     rank_col
-                   } else {
-                     NULL
-                   },
-                   ".bin", ".bin_mid")
+    group_map <- c(
+      if (!is.null(group_col)) group_col else NULL,
+      if (!is.null(rank_col) && isTRUE(facet_by_rank)) {
+        rank_col
+      } else {
+        NULL
+      },
+      ".bin", ".bin_mid"
+    )
 
     # calculate the mean/sd per bin
     sdat <- df |>
       dplyr::group_by(dplyr::across(dplyr::all_of(group_map))) |>
-      dplyr::summarise(y = mean(.data[[metric_col]], na.rm = TRUE),
-                       sd = stats::sd(.data[[metric_col]], na.rm = TRUE),
-                       n = dplyr::n(), .groups = "drop")
+      dplyr::summarise(
+        y = mean(.data[[metric_col]], na.rm = TRUE),
+        sd = stats::sd(.data[[metric_col]], na.rm = TRUE),
+        n = dplyr::n(), .groups = "drop"
+      )
 
     # calculate the se +- lwr/upr CI bands based on the normal distribution
     # (simplified scenario)
     z <- stats::qnorm(1 - (1 - ci_level) / 2)
     sdat <- sdat |>
-      dplyr::mutate(se = sd / sqrt(pmax(n, 1)),
-                    lwr = y - z * se, upr = y + z * se)
+      dplyr::mutate(
+        se = sd / sqrt(pmax(n, 1)),
+        lwr = y - z * se, upr = y + z * se
+      )
 
     # the same as in the gam section (see comments up)
     sdat$.grp <- if (!is.null(group_col) &&
-                     !is.null(rank_col) &&
-                     isTRUE(facet_by_rank)) {
+      !is.null(rank_col) &&
+      isTRUE(facet_by_rank)) {
       interaction(sdat[[group_col]], sdat[[rank_col]], drop = TRUE)
     } else if (!is.null(group_col)) {
       sdat[[group_col]]
@@ -1561,8 +1689,10 @@ plot_alpha_diversity <- function(x, ...) {
       p <- p +
         ggplot2::geom_point(
           data = df,
-          ggplot2::aes(x = .data[[time_col]], y = .data[[metric_col]],
-                       color = .data[[group_col]]),
+          ggplot2::aes(
+            x = .data[[time_col]], y = .data[[metric_col]],
+            color = .data[[group_col]]
+          ),
           alpha = point_alpha, size = if (point_alpha > 0) 1.6 else 0
         )
     } else {
@@ -1578,16 +1708,20 @@ plot_alpha_diversity <- function(x, ...) {
     p <- p +
       ggplot2::geom_ribbon(
         data = sdat,
-        ggplot2::aes(x = .data$.bin_mid, ymin = .data$lwr, ymax = .data$upr,
-                     group = .data$.grp),
+        ggplot2::aes(
+          x = .data$.bin_mid, ymin = .data$lwr, ymax = .data$upr,
+          group = .data$.grp
+        ),
         fill = ci_fill, alpha = ci_alpha, colour = NA, inherit.aes = FALSE
       ) +
       {
         if (!is.null(group_col)) {
           ggplot2::geom_line(
             data = sdat,
-            ggplot2::aes(x = .data$.bin_mid, y = .data$y,
-                         color = .data[[group_col]], group = .data$.grp),
+            ggplot2::aes(
+              x = .data$.bin_mid, y = .data$y,
+              color = .data[[group_col]], group = .data$.grp
+            ),
             linewidth = 1
           )
         } else {
@@ -1602,14 +1736,18 @@ plot_alpha_diversity <- function(x, ...) {
       theme_phip()
 
     if (!is.null(group_col)) p <- .add_phip_scales(p, custom_colors)
-    p <- .maybe_facet_by_rank(p, df, rank_col, facet_by_rank, ncol,
-                              facet_scales)
+    p <- .maybe_facet_by_rank(
+      p, df, rank_col, facet_by_rank, ncol,
+      facet_scales
+    )
     return(p)
   }
 
   # LOESS fallback for regression/CI; actually not recommended (the best is gam)
-  p <- ggplot2::ggplot(df, ggplot2::aes(x = .data[[time_col]],
-                                        y = .data[[metric_col]])) +
+  p <- ggplot2::ggplot(df, ggplot2::aes(
+    x = .data[[time_col]],
+    y = .data[[metric_col]]
+  )) +
     {
       if (!is.null(group_col)) {
         ggplot2::aes(color = .data[[group_col]])
@@ -1617,10 +1755,14 @@ plot_alpha_diversity <- function(x, ...) {
         ggplot2::aes()
       }
     } +
-    ggplot2::geom_point(alpha = point_alpha,
-                        size = if (point_alpha > 0) 1.6 else 0) +
-    ggplot2::geom_smooth(method = "loess", se = TRUE, span = 0.75,
-                         level = ci_level) +
+    ggplot2::geom_point(
+      alpha = point_alpha,
+      size = if (point_alpha > 0) 1.6 else 0
+    ) +
+    ggplot2::geom_smooth(
+      method = "loess", se = TRUE, span = 0.75,
+      level = ci_level
+    ) +
     ggplot2::labs(x = time_col, y = ylab, color = group_col) +
     theme_phip()
 
@@ -1639,39 +1781,40 @@ plot_alpha_diversity <- function(x, ...) {
 #' @export
 plot_alpha_diversity.phip_data <- function(
     x,
-    metric = c("richness","shannon_diversity","simpson_diversity"),
+    metric = c("richness", "shannon_diversity", "simpson_diversity"),
     group_col = "group",
-    rank_col  = "rank",
+    rank_col = "rank",
     filter_groups = NULL,
-    filter_ranks  = NULL,
+    filter_ranks = NULL,
     custom_colors = NULL,
     facet_by_rank = TRUE,
     ncol = 2,
     facet_scales = "fixed",
     # longitudinal
     time_col = NULL,
-    continuous_mode = c("gam","binned","loess"),
+    continuous_mode = c("gam", "binned", "loess"),
     gam_k = 7,
     point_alpha = 0.25,
     # CIs
-    ci_method = c("model","bootstrap"),
-    ci_level  = 0.95,
+    ci_method = c("model", "bootstrap"),
+    ci_level = 0.95,
     boot_R = 500,
     boot_seed = NULL,
     boot_progress = TRUE,
     ci_fill = "grey70",
     ci_alpha = 0.15,
-    ...
-) {
+    ...) {
   stopifnot(inherits(x, "phip_data"))
   continuous_mode <- match.arg(continuous_mode)
-  ci_method       <- match.arg(ci_method)
+  ci_method <- match.arg(ci_method)
 
   # logging time
   .ph_with_timing(
     headline = "Plotting alpha diversity (<phip_data>)",
-    step     = sprintf("metrics: %s",
-                       paste(add_quotes(tolower(metric), 1L), collapse = ", ")),
+    step = sprintf(
+      "metrics: %s",
+      paste(add_quotes(tolower(metric), 1L), collapse = ", ")
+    ),
     expr = {
       # longitudinal mode reserved for the phip_alpha_diversity
       if (!is.null(time_col) && isTRUE(!isTRUE(x$meta$longitudinal))) {
@@ -1693,26 +1836,26 @@ plot_alpha_diversity.phip_data <- function(
       # generic call
       plot_alpha_diversity(
         alpha_list,
-        metric         = metric,
-        group_col      = group_col,
-        rank_col       = rank_col,
-        filter_groups  = filter_groups,
-        filter_ranks   = filter_ranks,
-        custom_colors  = custom_colors,
-        facet_by_rank  = facet_by_rank,
-        ncol           = ncol,
-        facet_scales   = facet_scales,
-        time_col       = time_col,
+        metric = metric,
+        group_col = group_col,
+        rank_col = rank_col,
+        filter_groups = filter_groups,
+        filter_ranks = filter_ranks,
+        custom_colors = custom_colors,
+        facet_by_rank = facet_by_rank,
+        ncol = ncol,
+        facet_scales = facet_scales,
+        time_col = time_col,
         continuous_mode = continuous_mode,
-        gam_k          = gam_k,
-        point_alpha    = point_alpha,
-        ci_method      = ci_method,
-        ci_level       = ci_level,
-        boot_R         = boot_R,
-        boot_seed      = boot_seed,
-        boot_progress  = boot_progress,
-        ci_fill        = ci_fill,
-        ci_alpha       = ci_alpha
+        gam_k = gam_k,
+        point_alpha = point_alpha,
+        ci_method = ci_method,
+        ci_level = ci_level,
+        boot_R = boot_R,
+        boot_seed = boot_seed,
+        boot_progress = boot_progress,
+        ci_fill = ci_fill,
+        ci_alpha = ci_alpha
       )
     },
     verbose = .ph_opt("verbose", TRUE)
@@ -1727,38 +1870,39 @@ plot_alpha_diversity.phip_data <- function(
 #' @export
 plot_alpha_diversity.data.frame <- function(
     x,
-    metric = c("richness","shannon_diversity","simpson_diversity"),
+    metric = c("richness", "shannon_diversity", "simpson_diversity"),
     group_col = "group",
-    rank_col  = "rank",
+    rank_col = "rank",
     filter_groups = NULL,
-    filter_ranks  = NULL,
+    filter_ranks = NULL,
     custom_colors = NULL,
     facet_by_rank = TRUE,
     ncol = 2,
     facet_scales = "fixed",
     # longitudinal
     time_col = NULL,
-    continuous_mode = c("gam","binned","loess"),
+    continuous_mode = c("gam", "binned", "loess"),
     gam_k = 7,
     point_alpha = 0.25,
     # CIs
-    ci_method = c("model","bootstrap"),
-    ci_level  = 0.95,
+    ci_method = c("model", "bootstrap"),
+    ci_level = 0.95,
     boot_R = 500,
     boot_seed = NULL,
     boot_progress = TRUE,
     ci_fill = "grey70",
     ci_alpha = 0.15,
-    ...
-) {
+    ...) {
   continuous_mode <- match.arg(continuous_mode)
-  ci_method       <- match.arg(ci_method)
+  ci_method <- match.arg(ci_method)
 
   # timelog
   .ph_with_timing(
     headline = "Plotting alpha diversity (data.frame)",
-    step     = sprintf("metrics: %s",
-                       paste(add_quotes(tolower(metric), 1L), collapse = ", ")),
+    step = sprintf(
+      "metrics: %s",
+      paste(add_quotes(tolower(metric), 1L), collapse = ", ")
+    ),
     expr = {
       # firstly compute the diversity, no additional logs needed
       alpha_list <- compute_alpha_diversity(
@@ -1771,26 +1915,26 @@ plot_alpha_diversity.data.frame <- function(
       # generic call --> dispatcher
       plot_alpha_diversity(
         alpha_list,
-        metric         = metric,
-        group_col      = group_col,
-        rank_col       = rank_col,
-        filter_groups  = filter_groups,
-        filter_ranks   = filter_ranks,
-        custom_colors  = custom_colors,
-        facet_by_rank  = facet_by_rank,
-        ncol           = ncol,
-        facet_scales   = facet_scales,
-        time_col       = time_col,
+        metric = metric,
+        group_col = group_col,
+        rank_col = rank_col,
+        filter_groups = filter_groups,
+        filter_ranks = filter_ranks,
+        custom_colors = custom_colors,
+        facet_by_rank = facet_by_rank,
+        ncol = ncol,
+        facet_scales = facet_scales,
+        time_col = time_col,
         continuous_mode = continuous_mode,
-        gam_k          = gam_k,
-        point_alpha    = point_alpha,
-        ci_method      = ci_method,
-        ci_level       = ci_level,
-        boot_R         = boot_R,
-        boot_seed      = boot_seed,
-        boot_progress  = boot_progress,
-        ci_fill        = ci_fill,
-        ci_alpha       = ci_alpha
+        gam_k = gam_k,
+        point_alpha = point_alpha,
+        ci_method = ci_method,
+        ci_level = ci_level,
+        boot_R = boot_R,
+        boot_seed = boot_seed,
+        boot_progress = boot_progress,
+        ci_fill = ci_fill,
+        ci_alpha = ci_alpha
       )
     },
     verbose = .ph_opt("verbose", TRUE)
@@ -1805,50 +1949,53 @@ plot_alpha_diversity.data.frame <- function(
 #' @export
 plot_alpha_diversity.phip_alpha_diversity <- function(
     x,
-    metric = c("richness","shannon_diversity","simpson_diversity"),
+    metric = c("richness", "shannon_diversity", "simpson_diversity"),
     group_col = "group",
-    rank_col  = "rank",
+    rank_col = "rank",
     filter_groups = NULL,
-    filter_ranks  = NULL,
+    filter_ranks = NULL,
     custom_colors = NULL,
     facet_by_rank = TRUE,
     ncol = 2,
     facet_scales = "fixed",
     # longitudinal
     time_col = NULL,
-    continuous_mode = c("gam","binned","loess"),
+    continuous_mode = c("gam", "binned", "loess"),
     gam_k = 7,
     point_alpha = 0.25,
     # CIs
-    ci_method = c("model","bootstrap"),
-    ci_level  = 0.95,
+    ci_method = c("model", "bootstrap"),
+    ci_level = 0.95,
     boot_R = 500,
     boot_seed = NULL,
     boot_progress = TRUE,
     ci_fill = "grey70",
     ci_alpha = 0.15,
-    ...
-) {
+    ...) {
   # all modes possible with this type of x arg
   continuous_mode <- match.arg(continuous_mode)
-  ci_method       <- match.arg(ci_method)
+  ci_method <- match.arg(ci_method)
 
   # log time
   .ph_with_timing(
     headline = "Plotting alpha diversity (precomputed)",
-    step     = sprintf("metrics: %s",
-                       paste(add_quotes(tolower(metric), 1L), collapse = ", ")),
+    step = sprintf(
+      "metrics: %s",
+      paste(add_quotes(tolower(metric), 1L), collapse = ", ")
+    ),
     expr = {
       # choose the correct tibble from the list
       alpha_df <- if (is.list(x) && !is.null(group_col) &&
-                       group_col %in% names(x)) {
+        group_col %in% names(x)) {
         tibble::as_tibble(x[[group_col]])
       } else if (is.list(x)) {
         # ---- robust handling for 1-element lists (e.g., group_col=NULL -->
         # $all_samples)
         # keep only elements that are data.frames/tibbles
-        inner <- x[vapply(x, function(el) inherits(el, "data.frame"),
-                          logical(1))]
+        inner <- x[vapply(
+          x, function(el) inherits(el, "data.frame"),
+          logical(1)
+        )]
         if (length(inner) == 1L) {
           tibble::as_tibble(inner[[1L]])
         } else if (length(inner) >= 1L) {
@@ -1866,10 +2013,12 @@ plot_alpha_diversity.phip_alpha_diversity <- function(
       }
 
       # soft-attrs passthrough
-      if (!is.null(attr(x, "group_cols", exact = TRUE)))
+      if (!is.null(attr(x, "group_cols", exact = TRUE))) {
         attr(alpha_df, "group_cols") <- attr(x, "group_cols", exact = TRUE)
-      if (!is.null(attr(x, "ranks", exact = TRUE)))
+      }
+      if (!is.null(attr(x, "ranks", exact = TRUE))) {
         attr(alpha_df, "ranks") <- attr(x, "ranks", exact = TRUE)
+      }
 
       print(alpha_df)
       # validate essentials
@@ -1888,11 +2037,13 @@ plot_alpha_diversity.phip_alpha_diversity <- function(
       if (!is.null(group_col) && !group_col %in% names(alpha_df)) {
         .ph_abort(
           headline = "Grouping column not found in precomputed alpha data.",
-          step     = "input validation",
-          bullets  = c(
+          step = "input validation",
+          bullets = c(
             sprintf("requested group_col: %s", add_quotes(group_col, 1L)),
-            sprintf("available columns: %s",
-                    paste(add_quotes(colnames(alpha_df), 1L), collapse = ", "))
+            sprintf(
+              "available columns: %s",
+              paste(add_quotes(colnames(alpha_df), 1L), collapse = ", ")
+            )
           )
         )
       }
@@ -1910,39 +2061,47 @@ plot_alpha_diversity.phip_alpha_diversity <- function(
 
       # optional filters
       if (!is.null(group_col) && !is.null(filter_groups)) {
-        alpha_df <- dplyr::filter(alpha_df,
-                                  .data[[group_col]] %in% !!filter_groups)
+        alpha_df <- dplyr::filter(
+          alpha_df,
+          .data[[group_col]] %in% !!filter_groups
+        )
       }
       if (!is.null(rank_col) && !is.null(filter_ranks)) {
-        alpha_df <- dplyr::filter(alpha_df,
-                                  .data[[rank_col]] %in% !!filter_ranks)
+        alpha_df <- dplyr::filter(
+          alpha_df,
+          .data[[rank_col]] %in% !!filter_ranks
+        )
       }
 
       # make one plot per metric
       plots <- lapply(metrics_norm, function(m) {
         .build_alpha_plot(
-          alpha_df      = alpha_df,
-          metric        = m,
-          group_col     = group_col,
-          rank_col      = rank_col,
+          alpha_df = alpha_df,
+          metric = m,
+          group_col = group_col,
+          rank_col = rank_col,
           filter_groups = filter_groups,
-          filter_ranks  = filter_ranks,
+          filter_ranks = filter_ranks,
           custom_colors = custom_colors,
           facet_by_rank = facet_by_rank,
-          ncol          = ncol,
-          facet_scales  = facet_scales,
-          time_col      = if (!is.null(time_col) &&
-                              time_col %in% names(alpha_df)) time_col else NULL,
+          ncol = ncol,
+          facet_scales = facet_scales,
+          time_col = if (!is.null(time_col) &&
+            time_col %in% names(alpha_df)) {
+            time_col
+          } else {
+            NULL
+          },
           continuous_mode = continuous_mode,
-          gam_k         = gam_k,
-          point_alpha   = point_alpha,
-          ci_method     = ci_method,
-          ci_level      = ci_level,
-          boot_R        = boot_R,
-          boot_seed     = boot_seed,
+          gam_k = gam_k,
+          point_alpha = point_alpha,
+          ci_method = ci_method,
+          ci_level = ci_level,
+          boot_R = boot_R,
+          boot_seed = boot_seed,
           boot_progress = boot_progress,
-          ci_fill       = ci_fill,
-          ci_alpha      = ci_alpha
+          ci_fill = ci_fill,
+          ci_alpha = ci_alpha
         )
       })
       names(plots) <- metrics_norm

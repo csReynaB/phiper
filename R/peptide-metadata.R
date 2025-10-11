@@ -33,22 +33,25 @@
 get_peptide_meta <- function(force_refresh = FALSE) {
   .ph_with_timing(
     headline = "Retrieving peptide metadata into DuckDB cache",
-    step     = sprintf("get_peptide_meta(force_refresh = %s)",
-                       as.character(force_refresh)),
+    step = sprintf(
+      "get_peptide_meta(force_refresh = %s)",
+      as.character(force_refresh)
+    ),
     expr = {
       # check if dependencies installed --> maybe hard dep in the future?
       rlang::check_installed(c("duckdb", "DBI", "dplyr", "withr"))
 
       # 1. Prep cache dir & DuckDB connection
       # a throw-away directory that vanishes when the calling environment ends
-      cache_dir  <- withr::local_tempdir("phiper_cache") # optional name-prefix
+      cache_dir <- withr::local_tempdir("phiper_cache") # optional name-prefix
       duckdb_file <- file.path(cache_dir, "phip_cache.duckdb")
       con <- DBI::dbConnect(duckdb::duckdb(), dbdir = duckdb_file)
       .ph_log_info("Opened DuckDB connection",
-                   bullets = c(
-                     sprintf("cache dir: %s", duckdb_file),
-                     "table: peptide_meta"
-                   ))
+        bullets = c(
+          sprintf("cache dir: %s", duckdb_file),
+          "table: peptide_meta"
+        )
+      )
 
       # 2. fast path: already cached? --> return
       ## the user can also force the evaluation by force_refresh arg
@@ -105,7 +108,7 @@ get_peptide_meta <- function(force_refresh = FALSE) {
 
         # 2) character "TRUE"/"FALSE" --> logical
         if (is.character(col) &&
-            all(tolower(col[!is.na(col)]) %in% c("true", "false", NA))) {
+          all(tolower(col[!is.na(col)]) %in% c("true", "false", NA))) {
           return(as.logical(col))
         }
 
@@ -120,8 +123,8 @@ get_peptide_meta <- function(force_refresh = FALSE) {
           # only proceed if all non-NA entries are numeric strings
           # and not all of them are "0" or "1"
           if (length(non_na) > 0 &&
-              all(is_num_str) &&
-              !all(non_na %in% c("0", "1"))) {
+            all(is_num_str) &&
+            !all(non_na %in% c("0", "1"))) {
             return(suppressWarnings(as.numeric(col)))
           }
         }
@@ -166,25 +169,28 @@ get_peptide_meta <- function(force_refresh = FALSE) {
   ok <- FALSE
 
   .ph_log_info("Starting download",
-               bullets = c(
-                 sprintf("dest: %s", dest)
-               ))
+    bullets = c(
+      sprintf("dest: %s", dest)
+    )
+  )
 
   ## perform the actual download with given method (or at least try)
   for (m in methods) {
     status <- tryCatch(
       utils::download.file(
         url, dest,
-        mode   = "wb",
-        quiet  = TRUE,
+        mode = "wb",
+        quiet = TRUE,
         method = if (nzchar(m)) m else getOption("download.file.method")
       ),
-      error   = function(e) e,
+      error = function(e) e,
       warning = function(w) w
     )
     if (identical(status, 0L)) {
-      .ph_log_ok(sprintf("Download succeeded (method = %s)",
-                         if (nzchar(m)) m else "<getOption()>"))
+      .ph_log_ok(sprintf(
+        "Download succeeded (method = %s)",
+        if (nzchar(m)) m else "<getOption()>"
+      ))
       ok <- TRUE
       break
     } else {
@@ -200,8 +206,8 @@ get_peptide_meta <- function(force_refresh = FALSE) {
   if (!ok || !fs::file_exists(dest) || fs::file_info(dest)$size == 0) {
     .ph_abort(
       headline = "Failed to download file.",
-      step     = "download.file",
-      bullets  = c(
+      step = "download.file",
+      bullets = c(
         sprintf("url: %s", url),
         sprintf("dest: %s", dest)
       )
@@ -219,11 +225,11 @@ get_peptide_meta <- function(force_refresh = FALSE) {
     )
 
     if (is.na(sha_actual) ||
-        !identical(tolower(sha_actual), tolower(sha_expected))) {
+      !identical(tolower(sha_actual), tolower(sha_expected))) {
       .ph_warn(
         headline = "Checksum mismatch for downloaded file.",
-        step     = "integrity check",
-        bullets  = c(
+        step = "integrity check",
+        bullets = c(
           sprintf("expected: %s", sha_expected),
           sprintf("actual:   %s", sha_actual %||% "NA")
         )
