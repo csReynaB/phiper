@@ -63,10 +63,10 @@ get_peptide_meta <- function(force_refresh = FALSE) {
       url <- paste0(
         "https://raw.githubusercontent.com/Polymerase3/phiper/",
         "master/library-metadata/",
-        "combined_libraries_with_lineages_important_info_nonAAseq.rds"
+        "combined_libraries_11.10.25.rds"
       )
       tmp <- tempfile(fileext = ".rds")
-      sha <- "177a72117993becb19f0109bb450b700f9a3749dc2cdab23ebdeb97f26b15f4c"
+      sha <- "b96411168c9c3c27d00ca45f1533cef56522d73c7d8d4a95caa3de1a5890d2d5 "
 
       ## safe download (fallbacks if file changed, or if download does not
       ## succeed)
