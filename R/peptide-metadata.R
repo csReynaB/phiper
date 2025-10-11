@@ -47,10 +47,10 @@ get_peptide_meta <- function(force_refresh = FALSE) {
       duckdb_file <- file.path(cache_dir, "phip_cache.duckdb")
       con <- DBI::dbConnect(duckdb::duckdb(), dbdir = duckdb_file)
       .ph_log_info("Opened DuckDB connection",
-                   bullets = c(
-                     sprintf("cache dir: %s", duckdb_file),
-                     "table: peptide_meta"
-                   )
+        bullets = c(
+          sprintf("cache dir: %s", duckdb_file),
+          "table: peptide_meta"
+        )
       )
 
       # 2. fast path: already cached? --> return
@@ -108,7 +108,7 @@ get_peptide_meta <- function(force_refresh = FALSE) {
 
         # 2) character "TRUE"/"FALSE" --> logical
         if (is.character(col) &&
-            all(tolower(col[!is.na(col)]) %in% c("true", "false", NA))) {
+          all(tolower(col[!is.na(col)]) %in% c("true", "false", NA))) {
           return(as.logical(col))
         }
 
@@ -123,8 +123,8 @@ get_peptide_meta <- function(force_refresh = FALSE) {
           # only proceed if all non-NA entries are numeric strings
           # and not all of them are "0" or "1"
           if (length(non_na) > 0 &&
-              all(is_num_str) &&
-              !all(non_na %in% c("0", "1"))) {
+            all(is_num_str) &&
+            !all(non_na %in% c("0", "1"))) {
             return(suppressWarnings(as.numeric(col)))
           }
         }
@@ -169,9 +169,9 @@ get_peptide_meta <- function(force_refresh = FALSE) {
   ok <- FALSE
 
   .ph_log_info("Starting download",
-               bullets = c(
-                 sprintf("dest: %s", dest)
-               )
+    bullets = c(
+      sprintf("dest: %s", dest)
+    )
   )
 
   ## perform the actual download with given method (or at least try)
@@ -225,7 +225,7 @@ get_peptide_meta <- function(force_refresh = FALSE) {
     )
 
     if (is.na(sha_actual) ||
-        !identical(tolower(sha_actual), tolower(sha_expected))) {
+      !identical(tolower(sha_actual), tolower(sha_expected))) {
       .ph_warn(
         headline = "Checksum mismatch for downloaded file.",
         step = "integrity check",

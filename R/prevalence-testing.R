@@ -36,58 +36,65 @@
 ph_prevalence_compare <- function(x,
                                   rank_cols,
                                   group_cols,
-                                  exist_col         = "exist",
-                                  weight_mode       = c("peptide_count","none"),
-                                  parallel          = NULL,
+                                  exist_col = "exist",
+                                  weight_mode = c("peptide_count", "none"),
+                                  parallel = NULL,
                                   compute_ratios_db = TRUE,
-                                  interaction       = FALSE,
-                                  combine_cols      = NULL,
-                                  interaction_sep   = "::",
-                                  collect           = TRUE,
-                                  register_name     = NULL) {
-
+                                  interaction = FALSE,
+                                  combine_cols = NULL,
+                                  interaction_sep = "::",
+                                  collect = TRUE,
+                                  register_name = NULL) {
   weight_mode <- match.arg(weight_mode)
 
   .ph_with_timing(
     headline = "prevalence_compare (per-rank FDR)",
-    step     = NULL,
-    bullets  = NULL,
-    expr     = {
-
-      .q   <- function(con, nm) as.character(DBI::dbQuoteIdentifier(con, nm))
+    step = NULL,
+    bullets = NULL,
+    expr = {
+      .q <- function(con, nm) as.character(DBI::dbQuoteIdentifier(con, nm))
       .sym <- rlang::sym
       chunk_n <- getOption("phiper.prev.chunk", 1e6L)
 
       # ---- args / logging ----------------------------------------------------
-      tryCatch({
-        chk::chk_character(rank_cols);  chk::chk_true(length(rank_cols) >= 1)
-        chk::chk_character(group_cols); chk::chk_true(length(group_cols) >= 1)
-        chk::chk_string(exist_col)
+      tryCatch(
+        {
+          chk::chk_character(rank_cols)
+          chk::chk_true(length(rank_cols) >= 1)
+          chk::chk_character(group_cols)
+          chk::chk_true(length(group_cols) >= 1)
+          chk::chk_string(exist_col)
 
-        if (!is.null(combine_cols)) {
-          if (length(combine_cols) != 2L)
-            .ph_abort("combine_cols must be length 2 when provided.")
-          miss_int <- setdiff(combine_cols, group_cols)
-          if (length(miss_int))
-            .ph_abort("combine_cols must be subset of group_cols.", bullets = paste("-", miss_int))
-        }
-      }, error = function(e) .ph_abort("Invalid arguments", bullets = e$message))
+          if (!is.null(combine_cols)) {
+            if (length(combine_cols) != 2L) {
+              .ph_abort("combine_cols must be length 2 when provided.")
+            }
+            miss_int <- setdiff(combine_cols, group_cols)
+            if (length(miss_int)) {
+              .ph_abort("combine_cols must be subset of group_cols.", bullets = paste("-", miss_int))
+            }
+          }
+        },
+        error = function(e) .ph_abort("Invalid arguments", bullets = e$message)
+      )
 
       .ph_log_info(
         "Preparing input data",
         bullets = c(
           paste0("ranks: ", paste(rank_cols, collapse = ", ")),
           paste0("group_cols: ", paste(group_cols, collapse = ", ")),
-          if (!is.null(combine_cols)) paste0("combine_cols: ", paste(combine_cols, collapse = " + "))
-          else if (interaction) "interaction: TRUE (additive to per-column)",
+          if (!is.null(combine_cols)) {
+            paste0("combine_cols: ", paste(combine_cols, collapse = " + "))
+          } else if (interaction) "interaction: TRUE (additive to per-column)",
           paste0("exist_col: ", exist_col),
           paste0("weight_mode: ", weight_mode),
           paste0("collect: ", collect)
         )[!vapply(c(
           paste0("ranks: ", paste(rank_cols, collapse = ", ")),
           paste0("group_cols: ", paste(group_cols, collapse = ", ")),
-          if (!is.null(combine_cols)) paste0("combine_cols: ", paste(combine_cols, collapse = " + "))
-          else if (interaction) "interaction: TRUE (additive to per-column)" else NA_character_,
+          if (!is.null(combine_cols)) {
+            paste0("combine_cols: ", paste(combine_cols, collapse = " + "))
+          } else if (interaction) "interaction: TRUE (additive to per-column)" else NA_character_,
           paste0("exist_col: ", exist_col),
           paste0("weight_mode: ", weight_mode),
           paste0("collect: ", collect)
@@ -95,23 +102,26 @@ ph_prevalence_compare <- function(x,
       )
 
       # ---- normalize to long df ----------------------------------------------
-      df_long <- try({
-        if (inherits(x, "phip_data")) {
-          x$data_long |>
-            dplyr::select(tidyselect::any_of(c("sample_id","peptide_id", exist_col, group_cols)))
-        } else {
-          chk::chk_data(x)
-          need <- c("sample_id","peptide_id", exist_col, group_cols)
-          miss <- setdiff(need, colnames(x))
-          if (length(miss)) .ph_abort("Missing required columns", bullets = paste("-", miss))
-          tibble::as_tibble(x) |>
-            dplyr::select(tidyselect::any_of(need))
-        }
-      }, silent = TRUE)
+      df_long <- try(
+        {
+          if (inherits(x, "phip_data")) {
+            x$data_long |>
+              dplyr::select(tidyselect::any_of(c("sample_id", "peptide_id", exist_col, group_cols)))
+          } else {
+            chk::chk_data(x)
+            need <- c("sample_id", "peptide_id", exist_col, group_cols)
+            miss <- setdiff(need, colnames(x))
+            if (length(miss)) .ph_abort("Missing required columns", bullets = paste("-", miss))
+            tibble::as_tibble(x) |>
+              dplyr::select(tidyselect::any_of(need))
+          }
+        },
+        silent = TRUE
+      )
       if (inherits(df_long, "try-error")) .ph_abort("Could not prepare input data.")
 
       df_long <- df_long |>
-        dplyr::mutate(!! .sym(exist_col) := dplyr::coalesce(as.integer(!! .sym(exist_col)), 0L))
+        dplyr::mutate(!!.sym(exist_col) := dplyr::coalesce(as.integer(!!.sym(exist_col)), 0L))
 
       # connection
       con <- NULL
@@ -124,8 +134,9 @@ ph_prevalence_compare <- function(x,
       # ---- ranks & library ---------------------------------------------------
       ranks_needing_lib <- setdiff(rank_cols, "peptide_id")
       if (length(ranks_needing_lib)) {
-        if (!inherits(x, "phip_data") || is.null(x$peptide_library))
+        if (!inherits(x, "phip_data") || is.null(x$peptide_library)) {
           .ph_abort("Peptide library required for non-peptide ranks.")
+        }
         miss_tax <- setdiff(ranks_needing_lib, colnames(x$peptide_library))
         if (length(miss_tax)) .ph_abort("Requested taxonomy columns not in peptide_library.", bullets = paste("-", miss_tax))
       }
@@ -133,7 +144,7 @@ ph_prevalence_compare <- function(x,
       df_ranked <- df_long
       if (length(ranks_needing_lib)) {
         lib_cols <- c("peptide_id", ranks_needing_lib)
-        lib_min  <- x$peptide_library |>
+        lib_min <- x$peptide_library |>
           dplyr::select(tidyselect::all_of(lib_cols)) |>
           dplyr::distinct()
         df_ranked <- df_ranked |>
@@ -150,16 +161,16 @@ ph_prevalence_compare <- function(x,
           names_to  = "rank",
           values_to = "feature"
         ) %>%
-        dplyr::mutate(feature = as.character(feature))  # ensure TEXT/VARCHAR in DB
+        dplyr::mutate(feature = as.character(feature)) # ensure TEXT/VARCHAR in DB
 
       # ---- construct universes (per-column and/or interaction) ---------------
       make_interaction <- function(tbl, c1, c2, sep) {
         comb_name <- paste(c1, c2, sep = " + ")
         tbl |>
-          dplyr::filter(!is.na(!! .sym(c1)) & !is.na(!! .sym(c2))) |>
+          dplyr::filter(!is.na(!!.sym(c1)) & !is.na(!!.sym(c2))) |>
           dplyr::mutate(
             group_col   = comb_name,
-            group_value = paste0(!! .sym(c1), sep, !! .sym(c2))
+            group_value = paste0(!!.sym(c1), sep, !!.sym(c2))
           )
       }
 
@@ -198,12 +209,14 @@ ph_prevalence_compare <- function(x,
         dplyr::distinct(group_col, group_value, sample_id) |>
         dplyr::count(group_col, group_value, name = "N")
 
-      gs_n <- group_sizes |> dplyr::summarise(n = dplyr::n()) |> dplyr::collect()
+      gs_n <- group_sizes |>
+        dplyr::summarise(n = dplyr::n()) |>
+        dplyr::collect()
       if (gs_n$n == 0L) .ph_abort("No non-missing group values; cannot compute denominators.")
 
       .ph_log_info("Counting present samples per feature (POP)")
       present_counts <- gs_view |>
-        dplyr::filter(!! .sym(exist_col) > 0) |>
+        dplyr::filter(!!.sym(exist_col) > 0) |>
         dplyr::distinct(group_col, group_value, rank, feature, sample_id) |>
         dplyr::count(group_col, group_value, rank, feature, name = "n_present")
 
@@ -225,8 +238,10 @@ ph_prevalence_compare <- function(x,
         paste0("POOL per rank: ", paste(paste0(pool_tbl$rank, "=", pool_tbl$POOL), collapse = "; ")),
         paste0("Universes: ", paste(paste0(lev_tbl$group_col, " (k=", lev_tbl$k_levels, ", pairs=", lev_tbl$n_pairs, ")"), collapse = "; ")),
         paste0("Pairs per feature (sum across universes): ", sum_pairs),
-        paste0("Total tests m per rank = POOL * pairs: ",
-               paste(paste0(pool_tbl$rank, "=", pool_tbl$POOL * sum_pairs), collapse = "; "))
+        paste0(
+          "Total tests m per rank = POOL * pairs: ",
+          paste(paste0(pool_tbl$rank, "=", pool_tbl$POOL * sum_pairs), collapse = "; ")
+        )
       )
       .ph_log_info("FDR accounting", bullets = log_bullets)
 
@@ -239,8 +254,8 @@ ph_prevalence_compare <- function(x,
         dplyr::select(group_col, group_value, rank, feature)
 
       stats_long <- base_grid |>
-        dplyr::left_join(present_counts, by = c("group_col","group_value","rank","feature")) |>
-        dplyr::left_join(group_sizes,   by = c("group_col","group_value")) |>
+        dplyr::left_join(present_counts, by = c("group_col", "group_value", "rank", "feature")) |>
+        dplyr::left_join(group_sizes, by = c("group_col", "group_value")) |>
         dplyr::mutate(
           n_present = dplyr::coalesce(n_present, 0L),
           prop      = dplyr::if_else(N > 0, n_present / N, NA_real_),
@@ -248,11 +263,11 @@ ph_prevalence_compare <- function(x,
         )
 
       if (!is.na(view_const)) {
-        stats_long <- stats_long |> dplyr::mutate(view = !! view_const, .before = 1)
+        stats_long <- stats_long |> dplyr::mutate(view = !!view_const, .before = 1)
       }
 
       .ph_log_info("Building pairwise comparisons")
-      by_cols  <- intersect(c("view","rank","feature","group_col"), colnames(stats_long))
+      by_cols <- intersect(c("view", "rank", "feature", "group_col"), colnames(stats_long))
       has_view <- "view" %in% colnames(stats_long)
 
       pairs_joined <- stats_long |>
@@ -261,16 +276,14 @@ ph_prevalence_compare <- function(x,
         dplyr::mutate(
           group1_chr = dplyr::if_else(group_value_1 <= group_value_2, group_value_1, group_value_2),
           group2_chr = dplyr::if_else(group_value_1 <= group_value_2, group_value_2, group_value_1),
-
-          n1_val  = dplyr::if_else(group_value_1 <= group_value_2, n_present_1, n_present_2),
-          n1_tot  = dplyr::if_else(group_value_1 <= group_value_2, N_1,        N_2),
-          p1_val  = dplyr::if_else(group_value_1 <= group_value_2, prop_1,     prop_2),
-          pct1val = dplyr::if_else(group_value_1 <= group_value_2, percent_1,  percent_2),
-
-          n2_val  = dplyr::if_else(group_value_1 <= group_value_2, n_present_2, n_present_1),
-          n2_tot  = dplyr::if_else(group_value_1 <= group_value_2, N_2,         N_1),
-          p2_val  = dplyr::if_else(group_value_1 <= group_value_2, prop_2,      prop_1),
-          pct2val = dplyr::if_else(group_value_1 <= group_value_2, percent_2,   percent_1)
+          n1_val = dplyr::if_else(group_value_1 <= group_value_2, n_present_1, n_present_2),
+          n1_tot = dplyr::if_else(group_value_1 <= group_value_2, N_1, N_2),
+          p1_val = dplyr::if_else(group_value_1 <= group_value_2, prop_1, prop_2),
+          pct1val = dplyr::if_else(group_value_1 <= group_value_2, percent_1, percent_2),
+          n2_val = dplyr::if_else(group_value_1 <= group_value_2, n_present_2, n_present_1),
+          n2_tot = dplyr::if_else(group_value_1 <= group_value_2, N_2, N_1),
+          p2_val = dplyr::if_else(group_value_1 <= group_value_2, prop_2, prop_1),
+          pct2val = dplyr::if_else(group_value_1 <= group_value_2, percent_2, percent_1)
         ) |>
         dplyr::filter(group_value_1 == group1_chr)
 
@@ -296,12 +309,12 @@ ph_prevalence_compare <- function(x,
       if (isTRUE(compute_ratios_db)) {
         pairs_lazy <- pairs_lazy |>
           dplyr::mutate(
-            prop1_eps = dplyr::if_else(n1 == 0L, (n1 + 0.5)/n1_tot, prop1),
-            prop2_eps = dplyr::if_else(n2 == 0L, (n2 + 0.5)/n2_tot, prop2),
-            ratio     = prop1_eps / prop2_eps,
-            d1        = dplyr::if_else(n1 == 0L, (n1 + 1.0)/n1_tot, prop1),
-            d2        = dplyr::if_else(n2 == 0L, (n2 + 1.0)/n2_tot, prop2),
-            delta_ratio = dplyr::if_else(d1 >= d2, d1/d2 - 1, -(d2/d1 - 1))
+            prop1_eps = dplyr::if_else(n1 == 0L, (n1 + 0.5) / n1_tot, prop1),
+            prop2_eps = dplyr::if_else(n2 == 0L, (n2 + 0.5) / n2_tot, prop2),
+            ratio = prop1_eps / prop2_eps,
+            d1 = dplyr::if_else(n1 == 0L, (n1 + 1.0) / n1_tot, prop1),
+            d2 = dplyr::if_else(n2 == 0L, (n2 + 1.0) / n2_tot, prop2),
+            delta_ratio = dplyr::if_else(d1 >= d2, d1 / d2 - 1, -(d2 / d1 - 1))
           )
       }
 
@@ -315,25 +328,37 @@ ph_prevalence_compare <- function(x,
 
       .ph_log_ok(
         "Materialized DuckDB TABLE",
-        bullets = c(paste0("name: ", register_name),
-                    "computing p-values (Fisher-only); then FDR per rank (BH / wBH)")
+        bullets = c(
+          paste0("name: ", register_name),
+          "computing p-values (Fisher-only); then FDR per rank (BH / wBH)"
+        )
       )
 
       # ---- P-values (chunked; Fisher-only) ----------------------------------
       p_core_fisher <- function(n1, N1, n2, N2) {
-        n1 <- as.double(n1); N1 <- as.double(N1)
-        n2 <- as.double(n2); N2 <- as.double(N2)
-        if (any(!is.finite(c(n1,N1,n2,N2)))) return(NA_real_)
-        if (N1 <= 0 || N2 <= 0) return(NA_real_)
-        a  <- max(0, min(n1, N1)); b <- max(0, min(n2, N2))
-        c1 <- N1 - a;              c2 <- N2 - b
+        n1 <- as.double(n1)
+        N1 <- as.double(N1)
+        n2 <- as.double(n2)
+        N2 <- as.double(N2)
+        if (any(!is.finite(c(n1, N1, n2, N2)))) {
+          return(NA_real_)
+        }
+        if (N1 <= 0 || N2 <= 0) {
+          return(NA_real_)
+        }
+        a <- max(0, min(n1, N1))
+        b <- max(0, min(n2, N2))
+        c1 <- N1 - a
+        c2 <- N2 - b
         out <- try(stats::fisher.test(matrix(c(a, c1, b, c2), 2, byrow = TRUE))$p.value, silent = TRUE)
         if (inherits(out, "try-error")) NA_real_ else as.numeric(out)
       }
 
-      for (col in c("p_raw","p_adj_rank","p_adj_rank_wbh",
-                    "passed_rank_bh","passed_rank_wbh",
-                    "category_rank_bh","category_rank_wbh")) {
+      for (col in c(
+        "p_raw", "p_adj_rank", "p_adj_rank_wbh",
+        "passed_rank_bh", "passed_rank_wbh",
+        "category_rank_bh", "category_rank_wbh"
+      )) {
         DBI::dbExecute(
           con,
           paste0(
@@ -356,10 +381,12 @@ ph_prevalence_compare <- function(x,
         requireNamespace("future", quietly = TRUE) &&
           requireNamespace("future.apply", quietly = TRUE) &&
           tryCatch(future::nbrOfWorkers() > 1L, error = function(...) FALSE)
-      } else isTRUE(parallel)
+      } else {
+        isTRUE(parallel)
+      }
       if (want_parallel &&
-          (!requireNamespace("future", quietly = TRUE) ||
-           !requireNamespace("future.apply", quietly = TRUE))) {
+        (!requireNamespace("future", quietly = TRUE) ||
+          !requireNamespace("future.apply", quietly = TRUE))) {
         .ph_abort("Parallel requested but {future}/{future.apply} not available.")
       }
 
@@ -368,7 +395,7 @@ ph_prevalence_compare <- function(x,
         if (!nrow(chunk)) break
 
         colnames(chunk) <- tolower(colnames(chunk))
-        req  <- c("row_id","n1","n1_tot","n2","n2_tot")
+        req <- c("row_id", "n1", "n1_tot", "n2", "n2_tot")
         miss <- setdiff(req, colnames(chunk))
         if (length(miss)) .ph_abort("Fetched chunk is missing required columns.", bullets = paste("-", miss))
 
@@ -395,7 +422,7 @@ ph_prevalence_compare <- function(x,
 
         DBI::dbAppendTable(
           con,
-          name  = gsub('^\"|\"$', '', tmp_q),
+          name  = gsub('^\"|\"$', "", tmp_q),
           value = data.frame(row_id = chunk$row_id, p_raw = as.numeric(pvals))
         )
       }
@@ -411,7 +438,6 @@ ph_prevalence_compare <- function(x,
       DBI::dbExecute(con, paste0("DROP TABLE IF EXISTS ", wq))
 
       if (weight_mode == "peptide_count" && length(ranks_needing_lib)) {
-
         lib_cols_needed <- c("peptide_id", ranks_needing_lib)
         lib_src <- x$peptide_library %>%
           dplyr::select(tidyselect::all_of(lib_cols_needed)) %>%
@@ -422,19 +448,24 @@ ph_prevalence_compare <- function(x,
 
         if (inherits(lib_src, "tbl_sql")) {
           lib_df <- lib_src %>% dplyr::collect()
-          DBI::dbWriteTable(con, name = gsub('^\"|\"$', '', tmp_lib),
-                            value = tibble::as_tibble(lib_df),
-                            temporary = TRUE)
+          DBI::dbWriteTable(con,
+            name = gsub('^\"|\"$', "", tmp_lib),
+            value = tibble::as_tibble(lib_df),
+            temporary = TRUE
+          )
         } else {
-          DBI::dbWriteTable(con, name = gsub('^\"|\"$', '', tmp_lib),
-                            value = tibble::as_tibble(lib_src),
-                            temporary = TRUE)
+          DBI::dbWriteTable(con,
+            name = gsub('^\"|\"$', "", tmp_lib),
+            value = tibble::as_tibble(lib_src),
+            temporary = TRUE
+          )
         }
 
         bad <- ranks_needing_lib[!grepl("^[A-Za-z][A-Za-z0-9_]*$", ranks_needing_lib)]
         if (length(bad)) {
           .ph_abort("Taxa column names must be alphanumeric/underscore (start with a letter).",
-                    bullets = paste("-", bad))
+            bullets = paste("-", bad)
+          )
         }
 
         selects <- vapply(
@@ -470,7 +501,6 @@ ph_prevalence_compare <- function(x,
         }
 
         DBI::dbExecute(con, paste0("DROP TABLE IF EXISTS ", tmp_lib))
-
       } else {
         DBI::dbExecute(con, paste0("
           CREATE TABLE ", wq, " AS
@@ -582,21 +612,22 @@ ph_prevalence_compare <- function(x,
       # ---- return ------------------------------------------------------------
       if (isTRUE(collect)) {
         # ONLY CHANGE: join weights to expose n_peptides next to feature
-        wq_name <- gsub('^\"|\"$', '', wq)
+        wq_name <- gsub('^\"|\"$', "", wq)
 
         out <- dplyr::tbl(con, register_name) |>
-          dplyr::left_join(dplyr::tbl(con, wq_name), by = c("rank","feature")) |>
+          dplyr::left_join(dplyr::tbl(con, wq_name), by = c("rank", "feature")) |>
           dplyr::arrange(rank, feature, group_col, group1, group2) |>
           dplyr::collect()
 
         out <- out |>
           dplyr::select(
             tidyselect::any_of("view"),
-            rank, feature, n_peptides,   # <- added here, right after feature
+            rank, feature, n_peptides, # <- added here, right after feature
             group_col, group1, group2,
-            n1, N1 = n1_tot, prop1, percent1,
+            n1,
+            N1 = n1_tot, prop1, percent1,
             n2, N2 = n2_tot, prop2, percent2,
-            tidyselect::any_of(c("ratio","delta_ratio")),
+            tidyselect::any_of(c("ratio", "delta_ratio")),
             p_raw,
             p_adj_rank, passed_rank_bh, category_rank_bh,
             p_adj_rank_wbh, passed_rank_wbh, category_rank_wbh
