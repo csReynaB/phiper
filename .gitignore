@@ -4,8 +4,12 @@
 .httr-oauth
 .DS_Store
 .quarto
-counts_long.parquet
 .Renviron
+counts_long.parquet
 
-local-etl/
 local-data/
+local-cache/
+local-etl/
+*.fastq
+*.csv.gz
+

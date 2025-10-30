@@ -4,3 +4,6 @@
 ^\.github$
 ^data-raw$
 ^library-metadata$
+^local-etl$
+^local-data$
+^local-cache$
