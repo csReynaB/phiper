@@ -1722,5 +1722,18 @@ plot_similarity_heatmap <- function(sim_tbl,
     verbose = verbose
   )
 
+  # --- attach ordered data used for the heatmap (for CSV export) ---------------
+  export_df <- df %>%
+    dplyr::select(
+      subject_left, subject_right, similarity,
+      time_left, group_left, time_right, group_right
+    )
+
+  attr(p, "heatmap_df") <- export_df
+  attr(p, "axis_levels") <- list(
+    rows = levels(df$subject_left),
+    cols = levels(df$subject_right)
+  )
+
   p
 }
