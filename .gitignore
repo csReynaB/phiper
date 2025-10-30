@@ -5,3 +5,7 @@
 .DS_Store
 .quarto
 counts_long.parquet
+.Renviron
+
+local-etl/
+local-data/
