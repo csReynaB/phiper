@@ -13,3 +13,10 @@ local-etl/
 *.fastq
 *.csv.gz
 
+src/*.o
+src/*.so
+src/*.dll
+src/*.a
+src/*.dSYM
+src/*.gcda
+src/*.gcno
