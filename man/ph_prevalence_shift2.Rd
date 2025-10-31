@@ -29,7 +29,8 @@ ph_prevalence_shift2(
   log_file = "ph_prevalence_shift.log",
   stream_path = NULL,
   return_results = TRUE,
-  append_stream = FALSE
+  append_stream = FALSE,
+  fold_change = c("none", "sum", "mean", "max", "median")
 )
 }
 \arguments{
