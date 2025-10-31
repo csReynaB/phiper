@@ -8,8 +8,8 @@ prep_dir <- Sys.getenv("PHIPER_PREPARE_DIR", unset = "")
 if (!nzchar(prep_dir)) {
   .ph_warn(
     headline = "[tests] phiper_prepare_dir not set",
-    step     = "falling back to package-root/local-etl",
-    bullets  = c(
+    step = "falling back to package-root/local-etl",
+    bullets = c(
       "set PHIPER_PREPARE_DIR in .Renviron for a fixed absolute path",
       sprintf("cwd: %s", getwd())
     )
@@ -34,8 +34,8 @@ if (run_heavy) {
   } else {
     .ph_warn(
       headline = "[tests] etl script not found",
-      step     = "skipping heavy data preparation",
-      bullets  = c(
+      step = "skipping heavy data preparation",
+      bullets = c(
         sprintf("path tried: %s", src),
         sprintf("prep_dir: %s", prep_dir)
       )

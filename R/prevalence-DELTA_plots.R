@@ -34,53 +34,62 @@
 #'
 #' @export
 deltaplot_prevalence <- function(
-    prev_tbl,
-    group_col = "Group",
-    value_col = "Prevalence",
-    peptide_col = "peptide_id",
-    group_order = NULL,
-    jitter_width = 0.005,
-    jitter_height = 0.005,
-    point_alpha = 0.25,
-    point_size = 0.6,
-    smooth = TRUE,
-    smooth_k = 5,
-    arrow_color = "red",
-    arrow_length_mm = 4,
-    arrow_pos_x = 0.97,
-    title = NULL,
-    subtitle = NULL,
-    xlab = NULL,
-    ylab = NULL
+  prev_tbl,
+  group_col = "Group",
+  value_col = "Prevalence",
+  peptide_col = "peptide_id",
+  group_order = NULL,
+  jitter_width = 0.005,
+  jitter_height = 0.005,
+  point_alpha = 0.25,
+  point_size = 0.6,
+  smooth = TRUE,
+  smooth_k = 5,
+  arrow_color = "red",
+  arrow_length_mm = 4,
+  arrow_pos_x = 0.97,
+  title = NULL,
+  subtitle = NULL,
+  xlab = NULL,
+  ylab = NULL
 ) {
   # --- basic checks -----------------------------------------------------------
   need <- c(peptide_col, group_col, value_col)
   miss <- setdiff(need, names(prev_tbl))
   if (length(miss)) {
-    stop("deltaplot_prevalence: missing required columns: ",
-         paste(miss, collapse = ", "))
+    stop(
+      "deltaplot_prevalence: missing required columns: ",
+      paste(miss, collapse = ", ")
+    )
   }
 
   # --- wide table with exactly two groups ------------------------------------
   wide <- prev_tbl |>
     dplyr::select(dplyr::all_of(c(peptide_col, group_col, value_col))) |>
-    tidyr::pivot_wider(names_from = !!rlang::sym(group_col),
-                       values_from = !!rlang::sym(value_col))
+    tidyr::pivot_wider(
+      names_from = !!rlang::sym(group_col),
+      values_from = !!rlang::sym(value_col)
+    )
 
   grp_names <- setdiff(names(wide), peptide_col)
 
   if (length(grp_names) != 2L && is.null(group_order)) {
-    stop("deltaplot_prevalence: expected exactly two groups in `", group_col,
-         "`, found: ", paste(grp_names, collapse = ", "))
+    stop(
+      "deltaplot_prevalence: expected exactly two groups in `", group_col,
+      "`, found: ", paste(grp_names, collapse = ", ")
+    )
   }
 
   if (!is.null(group_order)) {
     if (length(group_order) != 2) stop("group_order must have length 2.")
     if (!all(group_order %in% grp_names)) {
-      stop("group_order values must be present in ", group_col,
-           ". Found groups: ", paste(grp_names, collapse = ", "))
+      stop(
+        "group_order values must be present in ", group_col,
+        ". Found groups: ", paste(grp_names, collapse = ", ")
+      )
     }
-    g1 <- group_order[1]; g2 <- group_order[2]
+    g1 <- group_order[1]
+    g2 <- group_order[2]
   } else {
     # stable (alphabetical) order
     g1 <- sort(grp_names)[1]
@@ -90,8 +99,8 @@ deltaplot_prevalence <- function(
   # --- pooled & delta ---------------------------------------------------------
   w <- wide |>
     dplyr::mutate(
-      pooled = ( .data[[g1]] + .data[[g2]] ) / 2,
-      delta  =  .data[[g2]] - .data[[g1]]
+      pooled = (.data[[g1]] + .data[[g2]]) / 2,
+      delta = .data[[g2]] - .data[[g1]]
     )
 
   w_clean <- w |>
@@ -108,10 +117,12 @@ deltaplot_prevalence <- function(
   # --- build plot -------------------------------------------------------------
   p <- ggplot2::ggplot(w_clean, ggplot2::aes(pooled_clip, delta)) +
     ggplot2::geom_hline(yintercept = 0, linetype = 2) +
-    ggplot2::geom_jitter(alpha = point_alpha,
-                         height = jitter_height,
-                         width = jitter_width,
-                         size = point_size)
+    ggplot2::geom_jitter(
+      alpha = point_alpha,
+      height = jitter_height,
+      width = jitter_width,
+      size = point_size
+    )
 
   if (isTRUE(smooth)) {
     # mgcv::gam; ok to depend on mgcv indirectly via ggplot2
@@ -197,8 +208,8 @@ deltaplot_prevalence <- function(
 #'   rank = "species",
 #'   feature_value = "Acadevirus PM93",
 #'   group_col = "timepoint_factor",
-#'   groups = c("T2","T8"),
-#'   labels = c("B","M12"),
+#'   groups = c("T2", "T8"),
+#'   labels = c("B", "M12"),
 #'   filter = list(big_group = "kid_serum")
 #' )
 #' # Now plot with your delta plotter:
@@ -206,30 +217,32 @@ deltaplot_prevalence <- function(
 #'
 #' @export
 ph_make_prev_tbl_standalone <- function(
-    x,
-    rank = "is_flagellum",
-    feature_value = TRUE,
-    group_col = "timepoint_factor",
-    groups = c("T2","T8"),
-    labels = c("B","M12"),
-    filter = list(),
-    eps = 0.5,
-    den_mult = 2
+  x,
+  rank = "is_flagellum",
+  feature_value = TRUE,
+  group_col = "timepoint_factor",
+  groups = c("T2", "T8"),
+  labels = c("B", "M12"),
+  filter = list(),
+  eps = 0.5,
+  den_mult = 2
 ) {
   stopifnot(length(groups) == 2L, length(labels) == 2L)
-  if (!inherits(x, "phip_data"))
+  if (!inherits(x, "phip_data")) {
     stop("`x` must be a phip_data with $data_long and $peptide_library.")
+  }
 
   dl <- x$data_long
-  need_cols <- c("sample_id","peptide_id",group_col,"exist")
+  need_cols <- c("sample_id", "peptide_id", group_col, "exist")
   miss <- setdiff(need_cols, colnames(dl))
   if (length(miss)) stop("x$data_long is missing: ", paste(miss, collapse = ", "))
 
   # 1) apply equality filters safely (SQL-friendly)
   if (length(filter)) {
     for (nm in names(filter)) {
-      if (!nm %in% colnames(dl))
+      if (!nm %in% colnames(dl)) {
         stop("Filter column '", nm, "' not in x$data_long.")
+      }
       vals <- filter[[nm]]
       dl <- dplyr::filter(dl, .data[[nm]] %in% !!vals)
     }
@@ -243,7 +256,7 @@ ph_make_prev_tbl_standalone <- function(
     dplyr::select(peptide_id, !!rlang::sym(rank)) %>%
     dplyr::distinct()
 
-  con_dl  <- tryCatch(dbplyr::remote_con(dl),      error = function(...) NULL)
+  con_dl <- tryCatch(dbplyr::remote_con(dl), error = function(...) NULL)
   con_lib <- tryCatch(dbplyr::remote_con(lib_src), error = function(...) NULL)
   same_con <- !is.null(con_dl) && !is.null(con_lib) && identical(con_dl, con_lib)
 
@@ -356,8 +369,10 @@ ph_make_prev_tbl_standalone <- function(
 #'
 #' @examples
 #' \dontrun{
-#' out <- forest_delta(res_shift, rank_of_interest = "species",
-#'                     n_each = 15, color = TRUE)
+#' out <- forest_delta(res_shift,
+#'   rank_of_interest = "species",
+#'   n_each = 15, color = TRUE
+#' )
 #' out$plot
 #' }
 #'
@@ -368,31 +383,31 @@ ph_make_prev_tbl_standalone <- function(
 #' @importFrom stats qnorm
 #' @export
 forest_delta <- function(
-    x,
-    rank_of_interest,
-    n_each = 15,
-    color = FALSE,
-    bh_only = TRUE,
-    add_signed_z_from_p = FALSE,
-    # arrow/label params
-    left_label    = "More in group1",
-    right_label   = "More in group2",
-    arrow_frac    = 0.35,
-    text_size     = 3.8,
-    text_gap_frac = 0.06,
-    y_pad         = 0.6,
-    text_y_offset = 0.00,
-    text_vjust    = -0.30,
-    arrow_color   = "red",
-    arrow_lwd     = 0.6,
-    arrow_head_cm = 0.30
+  x,
+  rank_of_interest,
+  n_each = 15,
+  color = FALSE,
+  bh_only = TRUE,
+  add_signed_z_from_p = FALSE,
+  # arrow/label params
+  left_label = "More in group1",
+  right_label = "More in group2",
+  arrow_frac = 0.35,
+  text_size = 3.8,
+  text_gap_frac = 0.06,
+  y_pad = 0.6,
+  text_y_offset = 0.00,
+  text_vjust = -0.30,
+  arrow_color = "red",
+  arrow_lwd = 0.6,
+  arrow_head_cm = 0.30
 ) {
   # ---- basic checks -----------------------------------------------------------
   if (!is.data.frame(x)) {
     if (exists(".ph_abort", mode = "function")) .ph_abort("`x` must be a data.frame/tibble.")
     stop("`x` must be a data.frame/tibble.")
   }
-  need_cols <- c("rank","feature","group1","group2","design","T_obs","p_perm","p_adj_rank","category_rank_bh")
+  need_cols <- c("rank", "feature", "group1", "group2", "design", "T_obs", "p_perm", "p_adj_rank", "category_rank_bh")
   miss <- setdiff(need_cols, colnames(x))
   if (length(miss)) {
     msg <- paste("`x` is missing required columns:", paste(miss, collapse = ", "))
@@ -401,25 +416,36 @@ forest_delta <- function(
 
   # ---- simple timer + closing log --------------------------------------------
   t0 <- Sys.time()
-  on.exit({
-    elapsed <- round(as.numeric(difftime(Sys.time(), t0, units = "secs")), 3)
-    if (exists(".ph_log_ok", mode = "function")) {
-      # no 'step' param → nic nie dotyka nzchar(step)
-      try(.ph_log_ok(headline = "forest_delta finished",
-                     bullets  = sprintf("elapsed: %s s", elapsed)),
-          silent = TRUE)
-    } else {
-      message(sprintf("[forest_delta] elapsed: %0.3f s", elapsed))
-    }
-  }, add = TRUE)
+  on.exit(
+    {
+      elapsed <- round(as.numeric(difftime(Sys.time(), t0, units = "secs")), 3)
+      if (exists(".ph_log_ok", mode = "function")) {
+        # no 'step' param → nic nie dotyka nzchar(step)
+        try(
+          .ph_log_ok(
+            headline = "forest_delta finished",
+            bullets = sprintf("elapsed: %s s", elapsed)
+          ),
+          silent = TRUE
+        )
+      } else {
+        message(sprintf("[forest_delta] elapsed: %0.3f s", elapsed))
+      }
+    },
+    add = TRUE
+  )
 
   # ---- optional signed Z from permutation p ----------------------------------
   if (isTRUE(add_signed_z_from_p)) {
-    x$Z_signed_from_p_2s <- sign(x$T_obs) * stats::qnorm(1 - x$p_perm/2)
+    x$Z_signed_from_p_2s <- sign(x$T_obs) * stats::qnorm(1 - x$p_perm / 2)
     if (exists(".ph_log_info", mode = "function")) {
-      try(.ph_log_info(headline = "added signed Z from permutation p",
-                       bullets  = "column: Z_signed_from_p_2s"),
-          silent = TRUE)
+      try(
+        .ph_log_info(
+          headline = "added signed Z from permutation p",
+          bullets = "column: Z_signed_from_p_2s"
+        ),
+        silent = TRUE
+      )
     }
   }
 
@@ -431,10 +457,16 @@ forest_delta <- function(
 
   if (nrow(df_rk) == 0L) {
     if (exists(".ph_log_info", mode = "function")) {
-      try(.ph_log_info(headline = "no rows left for plotting",
-                       bullets  = c(paste0("rank: ", rank_of_interest),
-                                    paste0("bh_only: ", bh_only))),
-          silent = TRUE)
+      try(
+        .ph_log_info(
+          headline = "no rows left for plotting",
+          bullets = c(
+            paste0("rank: ", rank_of_interest),
+            paste0("bh_only: ", bh_only)
+          )
+        ),
+        silent = TRUE
+      )
     }
     return(list(
       data = df_rk,
@@ -461,8 +493,8 @@ forest_delta <- function(
     )
 
   # ---- subtitle context -------------------------------------------------------
-  g1  <- if (nrow(df_plot)) df_plot$group1[1] else ""
-  g2  <- if (nrow(df_plot)) df_plot$group2[1] else ""
+  g1 <- if (nrow(df_plot)) df_plot$group1[1] else ""
+  g2 <- if (nrow(df_plot)) df_plot$group2[1] else ""
   des <- if (nrow(df_plot)) df_plot$design[1] else ""
 
   # ---- color normalization (cosmetic only) -----------------------------------
@@ -473,7 +505,7 @@ forest_delta <- function(
 
   df_plot$T_col <- dplyr::case_when(
     df_plot$T_obs < 0 ~ -abs(df_plot$T_obs) / max_neg,
-    df_plot$T_obs > 0 ~  df_plot$T_obs / max_pos,
+    df_plot$T_obs > 0 ~ df_plot$T_obs / max_pos,
     TRUE ~ 0
   )
   gamma <- 0.85
@@ -485,8 +517,10 @@ forest_delta <- function(
     {
       if (isTRUE(color)) {
         ggplot2::geom_segment(
-          ggplot2::aes(x = 0, xend = .data$T_obs, y = .data$species_label, yend = .data$species_label,
-                       color = .data$T_col),
+          ggplot2::aes(
+            x = 0, xend = .data$T_obs, y = .data$species_label, yend = .data$species_label,
+            color = .data$T_col
+          ),
           linewidth = 1, alpha = 0.9, show.legend = FALSE
         )
       } else {
@@ -505,8 +539,10 @@ forest_delta <- function(
     } +
     ggplot2::labs(
       title = sprintf("Top/Bottom raw Stouffer T - rank: %s", rank_of_interest),
-      subtitle = sprintf("Contrast: %s vs %s (%s); shown: %d neg + %d pos",
-                         g1, g2, des, nrow(top_neg), nrow(top_pos)),
+      subtitle = sprintf(
+        "Contrast: %s vs %s (%s); shown: %d neg + %d pos",
+        g1, g2, des, nrow(top_neg), nrow(top_pos)
+      ),
       x = "Stouffer T (raw)",
       y = NULL
     ) +
@@ -521,16 +557,16 @@ forest_delta <- function(
   }
 
   # ---- arrows sized by RAW |T_obs| -------------------------------------------
-  lvl_n  <- length(levels(df_plot$species_label))
+  lvl_n <- length(levels(df_plot$species_label))
   if (lvl_n == 0L) lvl_n <- length(unique(df_plot$species_label))
-  y_top  <- lvl_n + y_pad
+  y_top <- lvl_n + y_pad
 
   maxabs <- max(abs(df_plot$T_obs), na.rm = TRUE)
   if (!is.finite(maxabs) || maxabs == 0) maxabs <- 1
 
-  x_off  <- arrow_frac * maxabs
-  x_left_text  <- -x_off - text_gap_frac * maxabs
-  x_right_text <-  x_off + text_gap_frac * maxabs
+  x_off <- arrow_frac * maxabs
+  x_left_text <- -x_off - text_gap_frac * maxabs
+  x_right_text <- x_off + text_gap_frac * maxabs
 
   # rewrite subtitle header to reflect left/right labels
   if (!is.null(p$labels$subtitle)) {
@@ -546,20 +582,32 @@ forest_delta <- function(
   p <- p +
     ggplot2::scale_y_discrete(expand = ggplot2::expansion(mult = c(0.05, 0.10))) +
     ggplot2::coord_cartesian(clip = "off") +
-    ggplot2::annotate("segment", x = 0, xend = -x_off, y = y_top, yend = y_top,
-                      colour = arrow_color, linewidth = arrow_lwd,
-                      arrow = ggplot2::arrow(length = grid::unit(arrow_head_cm, "cm"),
-                                             type = "closed", ends = "last")) +
-    ggplot2::annotate("text", x = x_left_text, y = y_top + text_y_offset, label = left_label,
-                      size = text_size, colour = arrow_color, fontface = "bold",
-                      hjust = 1, vjust = text_vjust) +
-    ggplot2::annotate("segment", x = 0, xend =  x_off, y = y_top, yend = y_top,
-                      colour = arrow_color, linewidth = arrow_lwd,
-                      arrow = ggplot2::arrow(length = grid::unit(arrow_head_cm, "cm"),
-                                             type = "closed", ends = "last")) +
-    ggplot2::annotate("text", x = x_right_text, y = y_top + text_y_offset, label = right_label,
-                      size = text_size, colour = arrow_color, fontface = "bold",
-                      hjust = 0, vjust = text_vjust)
+    ggplot2::annotate("segment",
+      x = 0, xend = -x_off, y = y_top, yend = y_top,
+      colour = arrow_color, linewidth = arrow_lwd,
+      arrow = ggplot2::arrow(
+        length = grid::unit(arrow_head_cm, "cm"),
+        type = "closed", ends = "last"
+      )
+    ) +
+    ggplot2::annotate("text",
+      x = x_left_text, y = y_top + text_y_offset, label = left_label,
+      size = text_size, colour = arrow_color, fontface = "bold",
+      hjust = 1, vjust = text_vjust
+    ) +
+    ggplot2::annotate("segment",
+      x = 0, xend = x_off, y = y_top, yend = y_top,
+      colour = arrow_color, linewidth = arrow_lwd,
+      arrow = ggplot2::arrow(
+        length = grid::unit(arrow_head_cm, "cm"),
+        type = "closed", ends = "last"
+      )
+    ) +
+    ggplot2::annotate("text",
+      x = x_right_text, y = y_top + text_y_offset, label = right_label,
+      size = text_size, colour = arrow_color, fontface = "bold",
+      hjust = 0, vjust = text_vjust
+    )
 
   list(data = df_plot, plot = p)
 }
@@ -572,8 +620,8 @@ forest_delta <- function(
       ggplot2::aes(x = x, y = y),
       label = label, color = "red", fontface = "bold", size = 6
     ) +
-    ggplot2::xlim(0, 1) + ggplot2::ylim(0, 1) +
+    ggplot2::xlim(0, 1) +
+    ggplot2::ylim(0, 1) +
     ggplot2::theme_void() +
     ggplot2::theme(panel.background = ggplot2::element_rect(fill = "white", colour = NA))
 }
-

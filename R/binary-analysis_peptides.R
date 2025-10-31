@@ -122,14 +122,15 @@ phip_calc_prevalence <- function(x,
 #' @return nested list: results[[group_col]][["G1_vs_G2"]] = list(comparison_df=..., N=c(N1,N2), groups=c(group1,g2), group_col=gcol)
 #' @export
 phip_test_prevalence <- function(
-    x,
-    prev_list,
-    group_cols = names(prev_list),
-    prevalence_threshold = NULL,
-    p_adjust = "BH",
-    epsilon_prop = 0.5,
-    epsilon_delta = 1,
-    alternative = "two.sided") {
+  x,
+  prev_list,
+  group_cols = names(prev_list),
+  prevalence_threshold = NULL,
+  p_adjust = "BH",
+  epsilon_prop = 0.5,
+  epsilon_delta = 1,
+  alternative = "two.sided"
+) {
   stopifnot(inherits(x, "phip_data"))
   dl <- x$data_long
 
@@ -285,16 +286,17 @@ phip_test_prevalence <- function(
 #' @return plotly object (interactive=TRUE) or ggplot
 #' @export
 phip_plot_prevalence_scatter <- function(
-    comparison,
-    highlight_cols = NULL,
-    highlight_colors = NULL,
-    default_color = "gray70",
-    significant_colors = c(
-      "not significant"                 = "dodgerblue",
-      "significant prior correction"    = "forestgreen",
-      "significant post FDR correction" = "firebrick"
-    ),
-    interactive = TRUE) {
+  comparison,
+  highlight_cols = NULL,
+  highlight_colors = NULL,
+  default_color = "gray70",
+  significant_colors = c(
+    "not significant"                 = "dodgerblue",
+    "significant prior correction"    = "forestgreen",
+    "significant post FDR correction" = "firebrick"
+  ),
+  interactive = TRUE
+) {
   # ---- basic checks ----------------------------------------------------------
   stopifnot(is.list(comparison), !is.null(comparison$comparison_df))
   df <- comparison$comparison_df

@@ -28,18 +28,19 @@
 #' @return Long tibble: method,time1,time2,group1,group2,subject1,subject2,similarity
 #' @export
 ph_compute_pairwise_similarity_cattime <- function(
-    x,
-    time_col,
-    group_col = NULL,
-    value_col = c("exist", "relative", "fold_change"),
-    methods = c("jaccard"),
-    compare_mode = c("within_group", "within_time", "mixed"),
-    timepairs = NULL,
-    min_features = 1L,
-    zero_fill_for_pearson = TRUE,
-    write_duckdb = FALSE,
-    register_name = NULL,
-    collect = TRUE) {
+  x,
+  time_col,
+  group_col = NULL,
+  value_col = c("exist", "relative", "fold_change"),
+  methods = c("jaccard"),
+  compare_mode = c("within_group", "within_time", "mixed"),
+  timepairs = NULL,
+  min_features = 1L,
+  zero_fill_for_pearson = TRUE,
+  write_duckdb = FALSE,
+  register_name = NULL,
+  collect = TRUE
+) {
   stopifnot(inherits(x, "phip_data"))
   if (!isTRUE(x$meta$longitudinal)) {
     .ph_abort("Longitudinal data required.",

@@ -104,71 +104,80 @@
 #'
 #' @export
 ph_prevalence_shift <- function(
-    x, rank_cols, group_cols,
-    exist_col            = "exist",
-    interaction          = FALSE,
-    combine_cols         = NULL,
-    interaction_sep      = "::",
-    # permutation options
-    B_permutations       = 2000L,
-    seed                 = 1L,
-    smooth_eps_num       = 0.5,
-    smooth_eps_den_mult  = 2.0,
-    min_max_prev         = 0.0,
-    weight_mode          = c("equal","se_invvar","n_eff_sqrt"),
-    stat_mode            = c("diff","asin"),
-    prev_strat           = c("none","decile"),
-    winsor_z             = 4.0,
-    # parallel
-    parallel             = NULL,   # integer cores; NULL => auto (1 by default)
-    rank_feature_keep    = NULL,
-    peptide_library      = NULL,
-    auto_fetch_library   = FALSE,
-    # logging
-    log                  = FALSE,
-    log_file             = "ph_prevalence_shift.log",
-    # STREAM/LOG — new arguments
-    stream_path          = NULL,          # path to RDS multi-object stream (serialize() appends)
-    return_results       = TRUE,          # read back the stream and return tibble
-    append_stream        = FALSE          # if TRUE, don't re-init header in stream
+  x, rank_cols, group_cols,
+  exist_col = "exist",
+  interaction = FALSE,
+  combine_cols = NULL,
+  interaction_sep = "::",
+  # permutation options
+  B_permutations = 2000L,
+  seed = 1L,
+  smooth_eps_num = 0.5,
+  smooth_eps_den_mult = 2.0,
+  min_max_prev = 0.0,
+  weight_mode = c("equal", "se_invvar", "n_eff_sqrt"),
+  stat_mode = c("diff", "asin"),
+  prev_strat = c("none", "decile"),
+  winsor_z = 4.0,
+  # parallel
+  parallel = NULL, # integer cores; NULL => auto (1 by default)
+  rank_feature_keep = NULL,
+  peptide_library = NULL,
+  auto_fetch_library = FALSE,
+  # logging
+  log = FALSE,
+  log_file = "ph_prevalence_shift.log",
+  # STREAM/LOG — new arguments
+  stream_path = NULL, # path to RDS multi-object stream (serialize() appends)
+  return_results = TRUE, # read back the stream and return tibble
+  append_stream = FALSE # if TRUE, don't re-init header in stream
 ) {
   weight_mode <- match.arg(weight_mode)
-  stat_mode   <- match.arg(stat_mode)
-  prev_strat  <- match.arg(prev_strat)
+  stat_mode <- match.arg(stat_mode)
+  prev_strat <- match.arg(prev_strat)
 
   # ---- Basic argument validation ---------------------------------------------
-  tryCatch({
-    chk::chk_character(rank_cols);  chk::chk_true(length(rank_cols) >= 1)
-    chk::chk_character(group_cols); chk::chk_true(length(group_cols) >= 1)
-    chk::chk_string(exist_col)
-    chk::chk_number(B_permutations); chk::chk_true(B_permutations >= 100)
-    if (!is.null(rank_feature_keep)) {
-      if (!is.list(rank_feature_keep) || is.null(names(rank_feature_keep))) {
-        .ph_abort("rank_feature_keep must be a *named* list: rank -> values to keep.")
+  tryCatch(
+    {
+      chk::chk_character(rank_cols)
+      chk::chk_true(length(rank_cols) >= 1)
+      chk::chk_character(group_cols)
+      chk::chk_true(length(group_cols) >= 1)
+      chk::chk_string(exist_col)
+      chk::chk_number(B_permutations)
+      chk::chk_true(B_permutations >= 100)
+      if (!is.null(rank_feature_keep)) {
+        if (!is.list(rank_feature_keep) || is.null(names(rank_feature_keep))) {
+          .ph_abort("rank_feature_keep must be a *named* list: rank -> values to keep.")
+        }
       }
-    }
-    if (!is.null(stream_path)) chk::chk_string(stream_path)
-  }, error = function(e) .ph_abort("Invalid arguments", bullets = e$message))
+      if (!is.null(stream_path)) chk::chk_string(stream_path)
+    },
+    error = function(e) .ph_abort("Invalid arguments", bullets = e$message)
+  )
 
   # ---- Prepare long data with required columns --------------------------------
-  df_long <- try({
-    if (inherits(x, "phip_data")) {
-      x$data_long |>
-        dplyr::select(tidyselect::any_of(c("sample_id","subject_id","peptide_id", exist_col, group_cols)))
-    } else {
-      chk::chk_data(x)
-      need <- c("sample_id","peptide_id", exist_col, group_cols, "subject_id")
-      miss <- setdiff(need, colnames(x))
-      if (length(miss) && !"subject_id" %in% miss) {
-        tibble::as_tibble(x) |>
-          dplyr::select(tidyselect::any_of(c("sample_id","peptide_id", exist_col, group_cols, "subject_id")))
-      } else if (!length(miss)) {
-        tibble::as_tibble(x) |> dplyr::select(tidyselect::any_of(need))
+  df_long <- try(
+    {
+      if (inherits(x, "phip_data")) {
+        x$data_long |>
+          dplyr::select(tidyselect::any_of(c("sample_id", "subject_id", "peptide_id", exist_col, group_cols)))
       } else {
-        .ph_abort("Missing required columns", bullets = paste("-", miss))
+        chk::chk_data(x)
+        need <- c("sample_id", "peptide_id", exist_col, group_cols, "subject_id")
+        miss <- setdiff(need, colnames(x))
+        if (length(miss) && !"subject_id" %in% miss) {
+          tibble::as_tibble(x) |>
+            dplyr::select(tidyselect::any_of(c("sample_id", "peptide_id", exist_col, group_cols, "subject_id")))
+        } else if (!length(miss)) {
+          tibble::as_tibble(x) |> dplyr::select(tidyselect::any_of(need))
+        } else {
+          .ph_abort("Missing required columns", bullets = paste("-", miss))
+        }
       }
-    }
-  }, silent = TRUE)
+    },
+    silent = TRUE
+  )
   if (inherits(df_long, "try-error")) {
     .ph_abort("Could not prepare input data.")
   }
@@ -187,7 +196,8 @@ ph_prevalence_shift <- function(
       miss_tax <- setdiff(ranks_needing_lib, colnames(x$peptide_library))
       if (length(miss_tax)) {
         .ph_abort("Requested taxonomy/annotation columns not in peptide_library.",
-                  bullets = paste("-", miss_tax))
+          bullets = paste("-", miss_tax)
+        )
       }
       lib_src <- x$peptide_library %>%
         dplyr::select(tidyselect::any_of(c("peptide_id", ranks_needing_lib))) %>%
@@ -203,7 +213,8 @@ ph_prevalence_shift <- function(
           miss_tax <- setdiff(ranks_needing_lib, colnames(peptide_library))
           if (length(miss_tax)) {
             .ph_abort("Provided `peptide_library` misses required columns:",
-                      bullets = paste("-", miss_tax))
+              bullets = paste("-", miss_tax)
+            )
           }
           lib_src <- peptide_library %>%
             dplyr::select(tidyselect::any_of(c("peptide_id", ranks_needing_lib))) %>%
@@ -220,7 +231,8 @@ ph_prevalence_shift <- function(
           miss_tax <- setdiff(ranks_needing_lib, colnames(lib_fetched))
           if (length(miss_tax)) {
             .ph_abort("Fetched peptide_meta lacks required columns:",
-                      bullets = paste("-", miss_tax))
+              bullets = paste("-", miss_tax)
+            )
           }
           lib_src <- lib_fetched %>%
             dplyr::select(tidyselect::any_of(c("peptide_id", ranks_needing_lib))) %>%
@@ -319,8 +331,10 @@ ph_prevalence_shift <- function(
   }
 
   # ---- Normalize and combine group-wise views --------------------------------
-  col_order <- c("sample_id","subject_id","peptide_id", exist_col,
-                 "rank","feature","group_col","group_value")
+  col_order <- c(
+    "sample_id", "subject_id", "peptide_id", exist_col,
+    "rank", "feature", "group_col", "group_value"
+  )
   select_norm <- function(tbl) {
     tbl2 <- tbl
     if (!"peptide_id" %in% colnames(tbl2)) {
@@ -338,18 +352,24 @@ ph_prevalence_shift <- function(
         group_value = as.character(.data$group_value)
       )
   }
-  per_norm <- per_column %>% select_norm() %>% dplyr::compute()
+  per_norm <- per_column %>%
+    select_norm() %>%
+    dplyr::compute()
   if (!is.null(inter_view)) {
-    inter_norm <- inter_view %>% select_norm() %>% dplyr::compute()
-    gs_view   <- dplyr::union_all(per_norm, inter_norm)
+    inter_norm <- inter_view %>%
+      select_norm() %>%
+      dplyr::compute()
+    gs_view <- dplyr::union_all(per_norm, inter_norm)
   } else {
-    gs_view   <- per_norm
+    gs_view <- per_norm
   }
 
   # ---- Materialize full long data for analysis -------------------------------
   dat_all <- gs_view %>%
-    dplyr::select(sample_id, dplyr::any_of("subject_id"), peptide_id,
-                  !!rlang::sym(exist_col), rank, feature, group_col, group_value) %>%
+    dplyr::select(
+      sample_id, dplyr::any_of("subject_id"), peptide_id,
+      !!rlang::sym(exist_col), rank, feature, group_col, group_value
+    ) %>%
     dplyr::rename(exist = !!rlang::sym(exist_col)) %>%
     dplyr::collect()
 
@@ -369,7 +389,7 @@ ph_prevalence_shift <- function(
     allow <- purrr::imap_dfr(rank_feature_keep, function(val, rk) {
       tibble::tibble(rank = rk, feature = as.character(val))
     })
-    strata <- dplyr::semi_join(strata, allow, by = c("rank","feature"))
+    strata <- dplyr::semi_join(strata, allow, by = c("rank", "feature"))
   }
   if (nrow(strata) == 0L) {
     .ph_abort("No valid strata to test (check group levels / ranks).")
@@ -400,11 +420,15 @@ ph_prevalence_shift <- function(
     gdf <- dat_all_local[
       dat_all_local$rank == st_row$rank &
         dat_all_local$feature == st_row$feature &
-        dat_all_local$group_col == st_row$group_col,
-      , drop = FALSE
+        dat_all_local$group_col == st_row$group_col, ,
+      drop = FALSE
     ]
-    lv <- sort(unique(gdf$group_value)); if (length(lv) != 2L) return(0)
-    g1 <- lv[1]; g2 <- lv[2]
+    lv <- sort(unique(gdf$group_value))
+    if (length(lv) != 2L) {
+      return(0)
+    }
+    g1 <- lv[1]
+    g2 <- lv[2]
 
     prev_tbl <- gdf %>%
       dplyr::group_by(peptide_id, group_value) %>%
@@ -413,30 +437,38 @@ ph_prevalence_shift <- function(
         n = dplyr::n_distinct(if ("subject_id" %in% names(gdf)) subject_id else sample_id),
         .groups = "drop"
       ) %>%
-      tidyr::pivot_wider(names_from = group_value, values_from = c(x,n), values_fill = 0L)
+      tidyr::pivot_wider(names_from = group_value, values_from = c(x, n), values_fill = 0L)
 
     need <- c(paste0("x_", g1), paste0("x_", g2), paste0("n_", g1), paste0("n_", g2))
-    if (!all(need %in% names(prev_tbl))) return(0)
+    if (!all(need %in% names(prev_tbl))) {
+      return(0)
+    }
 
-    eps <- smooth_eps_num; den_mult <- smooth_eps_den_mult
-    p1 <- (prev_tbl[[paste0("x_", g1)]] + eps) / (prev_tbl[[paste0("n_", g1)]] + den_mult*eps)
-    p2 <- (prev_tbl[[paste0("x_", g2)]] + eps) / (prev_tbl[[paste0("n_", g2)]] + den_mult*eps)
+    eps <- smooth_eps_num
+    den_mult <- smooth_eps_den_mult
+    p1 <- (prev_tbl[[paste0("x_", g1)]] + eps) / (prev_tbl[[paste0("n_", g1)]] + den_mult * eps)
+    p2 <- (prev_tbl[[paste0("x_", g2)]] + eps) / (prev_tbl[[paste0("n_", g2)]] + den_mult * eps)
     keep <- (pmax(p1, p2) >= min_max_prev)
-    if (!any(keep)) return(0)
+    if (!any(keep)) {
+      return(0)
+    }
 
-    p1 <- p1[keep]; p2 <- p2[keep]
-    n1 <- prev_tbl[[paste0("n_", g1)]][keep]; n2 <- prev_tbl[[paste0("n_", g2)]][keep]
+    p1 <- p1[keep]
+    p2 <- p2[keep]
+    n1 <- prev_tbl[[paste0("n_", g1)]][keep]
+    n2 <- prev_tbl[[paste0("n_", g2)]][keep]
 
     comb <- .combine_T_internal(
-      p1, p2, n1, n2, winsor_z = winsor_z,
+      p1, p2, n1, n2,
+      winsor_z = winsor_z,
       weight_mode = weight_mode, stat_mode = stat_mode, prev_strat = prev_strat
     )
     m_eff_i <- 1 / pmax(sum(comb$w_norm^2), 1e-12)
     as.numeric(m_eff_i)
   }
 
-  m_eff_est <- vapply(seq_len(n_contrasts), function(i) compute_m_eff_for_stratum(strata[i,], dat_all), numeric(1))
-  weight_i  <- as.numeric(B_permutations) * m_eff_est
+  m_eff_est <- vapply(seq_len(n_contrasts), function(i) compute_m_eff_for_stratum(strata[i, ], dat_all), numeric(1))
+  weight_i <- as.numeric(B_permutations) * m_eff_est
   work_total <- sum(weight_i)
 
   # init progress file & log header (with peptides+contrasts+weighted total)
@@ -445,8 +477,8 @@ ph_prevalence_shift <- function(
 
   # ----- FAST availability header line ----------------------------------------
   fast_possible <- identical(prev_strat, "none") &&
-    weight_mode %in% c("equal","se_invvar","n_eff_sqrt") &&
-    stat_mode %in% c("asin","diff") &&
+    weight_mode %in% c("equal", "se_invvar", "n_eff_sqrt") &&
+    stat_mode %in% c("asin", "diff") &&
     exists("perm_bitset_T_parallel", mode = "function")
   hdr_fast <- if (fast_possible) "CPP available (bitset+TBB)" else "CPP not available (fallback R)"
 
@@ -457,17 +489,21 @@ ph_prevalence_shift <- function(
       sprintf("peptides after filtering: %d", length(unique(dat_all$peptide_id))),
       sprintf("weighted work total (sum B*m_eff): %.3f", work_total),
       sprintf("mode: %s", if (!is.null(parallel) && parallel > 1L) "parallel (requested)" else "auto/sequential"),
-      sprintf("engine: %s", hdr_fast)  # <-- NEW
+      sprintf("engine: %s", hdr_fast) # <-- NEW
     )
-    if (log_to_file) .ph_log_info_file(log_file, "Starting permutation computations", bullets = hdr_bullets)
-    else             .ph_log_info("Starting permutation computations", bullets = hdr_bullets)
+    if (log_to_file) {
+      .ph_log_info_file(log_file, "Starting permutation computations", bullets = hdr_bullets)
+    } else {
+      .ph_log_info("Starting permutation computations", bullets = hdr_bullets)
+    }
   }
 
   # Prepare result container only if not streaming
   result_rows <- if (is.null(stream_path)) list() else NULL
 
   # ---- Determine number of workers -------------------------------------------
-  plan_changed <- FALSE; original_plan <- NULL
+  plan_changed <- FALSE
+  original_plan <- NULL
   n_workers <- 1L
   if (!is.null(parallel)) {
     parallel <- as.integer(parallel)
@@ -497,8 +533,9 @@ ph_prevalence_shift <- function(
       dat_uv <- dat_all[
         dat_all$rank == st$rank &
           dat_all$feature == st$feature &
-          dat_all$group_col == st$group_col,
-        , drop = FALSE]
+          dat_all$group_col == st$group_col, ,
+        drop = FALSE
+      ]
       res <- .one_contrast_internal(
         dat_uv              = dat_uv,
         weight_mode         = weight_mode,
@@ -536,11 +573,14 @@ ph_prevalence_shift <- function(
         # weighted progress update (with FAST marker)
         if (isTRUE(log)) {
           delta_w <- as.numeric(B_permutations) * as.numeric(row$m_eff)
-          done_w  <- .progress_add(progress_path, delta_w)
-          prog    <- if (work_total > 0) 100 * (done_w / work_total) else 100
+          done_w <- .progress_add(progress_path, delta_w)
+          prog <- if (work_total > 0) 100 * (done_w / work_total) else 100
           eng_mark <- if (!is.null(row$engine) && row$engine == "CPP") "[C]" else "[-]"
-          if (log_to_file) .ph_log_info_file(log_file, sprintf("progress=%.1f%% %s", prog, eng_mark))
-          else             .ph_log_info(sprintf("progress=%.1f%% %s", prog, eng_mark))
+          if (log_to_file) {
+            .ph_log_info_file(log_file, sprintf("progress=%.1f%% %s", prog, eng_mark))
+          } else {
+            .ph_log_info(sprintf("progress=%.1f%% %s", prog, eng_mark))
+          }
         }
       }
       if (isTRUE(log) && !log_to_file) {
@@ -548,11 +588,10 @@ ph_prevalence_shift <- function(
         flush.console()
       }
     }
-
   } else {
     ## PARALLEL via future.apply
     if (requireNamespace("future", quietly = TRUE)) {
-      original_plan <- future::plan()  # capture current plan
+      original_plan <- future::plan() # capture current plan
       if (future::nbrOfWorkers() < 2L || future::nbrOfWorkers() != n_workers) {
         if (.Platform$OS.type == "windows") {
           future::plan(future::multisession, workers = n_workers)
@@ -567,20 +606,20 @@ ph_prevalence_shift <- function(
     batches <- split(seq_len(n_contrasts), cut(seq_len(n_contrasts), breaks = k, labels = FALSE))
     batch_list <- lapply(batches, function(idx_vec) {
       list(
-        data    = dplyr::semi_join(dat_all, strata[idx_vec, ], by = c("rank","feature","group_col")),
-        strata  = tibble::as_tibble(strata[idx_vec, , drop = FALSE]),
-        offset  = min(idx_vec) - 1L,
+        data = dplyr::semi_join(dat_all, strata[idx_vec, ], by = c("rank", "feature", "group_col")),
+        strata = tibble::as_tibble(strata[idx_vec, , drop = FALSE]),
+        offset = min(idx_vec) - 1L,
         # pass stream/log/progress to workers
-        stream_path    = stream_path,
-        log_file       = if (isTRUE(log)) log_file else NULL,
-        progress_path  = if (isTRUE(log)) .progress_file(log_file, stream_path) else NULL,
+        stream_path = stream_path,
+        log_file = if (isTRUE(log)) log_file else NULL,
+        progress_path = if (isTRUE(log)) .progress_file(log_file, stream_path) else NULL,
         B_permutations = as.integer(B_permutations)
       )
     })
 
     result_lists <- future.apply::future_lapply(
       X = batch_list,
-      FUN = phiper:::.do_batch,         # updated version supports stream/log/progress + FAST marker in logs
+      FUN = phiper:::.do_batch, # updated version supports stream/log/progress + FAST marker in logs
       weight_mode = weight_mode, stat_mode = stat_mode, prev_strat = prev_strat,
       B = as.integer(B_permutations), seed_base = as.integer(seed),
       smooth_eps_num = smooth_eps_num, smooth_eps_den_mult = smooth_eps_den_mult,
@@ -589,21 +628,25 @@ ph_prevalence_shift <- function(
       log_path = if (isTRUE(log)) log_file else NULL,
       n_contrasts = n_contrasts,
       future.seed = TRUE,
-      future.packages = c("phiper","dplyr","tibble","tidyr","purrr","magrittr","stats","filelock")
+      future.packages = c("phiper", "dplyr", "tibble", "tidyr", "purrr", "magrittr", "stats", "filelock")
     )
     if (is.null(stream_path)) {
       result_rows <- purrr::flatten(result_lists)
     } else {
-      result_rows <- NULL  # already streamed by workers
+      result_rows <- NULL # already streamed by workers
     }
 
     # master: log final percentage
     if (isTRUE(log) && work_total > 0) {
       conr <- file(.progress_file(log_file, stream_path), open = "rb")
-      done_w <- tryCatch(unserialize(conr), error = function(e) 0); close(conr)
+      done_w <- tryCatch(unserialize(conr), error = function(e) 0)
+      close(conr)
       prog <- 100 * (done_w / work_total)
-      if (log_to_file) .ph_log_ok_file(log_file, sprintf("progress=%.1f%% (final)", prog))
-      else             .ph_log_ok(sprintf("progress=%.1f%% (final)", prog))
+      if (log_to_file) {
+        .ph_log_ok_file(log_file, sprintf("progress=%.1f%% (final)", prog))
+      } else {
+        .ph_log_ok(sprintf("progress=%.1f%% (final)", prog))
+      }
     }
   }
 
@@ -640,8 +683,8 @@ ph_prevalence_shift <- function(
     dplyr::mutate(
       category_rank_bh = dplyr::case_when(
         p_adj_rank < 0.05 ~ "significant (BH, per rank)",
-        p_perm     < 0.05 ~ "nominal only",
-        TRUE              ~ "not significant"
+        p_perm < 0.05 ~ "nominal only",
+        TRUE ~ "not significant"
       )
     ) %>%
     dplyr::select(

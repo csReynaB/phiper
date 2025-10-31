@@ -34,7 +34,7 @@ testthat::test_that("compute_alpha_diversity <phip_data> path works on ps_merged
     df <- out[[nm]]
     testthat::expect_s3_class(df, "tbl_df")
     testthat::expect_true(all(req_cols %in% names(df)))
-    testthat::expect_true(nm %in% names(df))  # grouping column present
+    testthat::expect_true(nm %in% names(df)) # grouping column present
     testthat::expect_true(all(df$richness >= 0, na.rm = TRUE))
     testthat::expect_true(all(df$shannon_diversity >= 0, na.rm = TRUE))
     testthat::expect_true(all(df$simpson_diversity >= 0, na.rm = TRUE))
@@ -58,8 +58,10 @@ testthat::test_that("compute_alpha_diversity data.frame path on filtered ps$data
   # filter to big_group == kid_serum timepoint_factor in T2 T6 -----------------
   .data <- rlang::.data
   df_small <- pd$data_long |>
-    dplyr::filter(.data$big_group == "kid_serum",
-                  .data$timepoint_factor %in% c("T2", "T6")) |>
+    dplyr::filter(
+      .data$big_group == "kid_serum",
+      .data$timepoint_factor %in% c("T2", "T6")
+    ) |>
     dplyr::collect()
 
   # minimal columns present ----------------------------------------------------
@@ -78,9 +80,11 @@ testthat::test_that("compute_alpha_diversity data.frame path on filtered ps$data
 
   res <- out_df$timepoint_factor
   testthat::expect_true(all(c("T2", "T6") %in% unique(res$timepoint_factor)))
-  testthat::expect_true(all(c("rank", "sample_id",
-                              "richness", "shannon_diversity", "simpson_diversity",
-                              "timepoint_factor") %in% names(res)))
+  testthat::expect_true(all(c(
+    "rank", "sample_id",
+    "richness", "shannon_diversity", "simpson_diversity",
+    "timepoint_factor"
+  ) %in% names(res)))
 
   # metrics are well formed -----------------------------------------------------
   testthat::expect_true(all(res$richness >= 0, na.rm = TRUE))
@@ -119,8 +123,10 @@ testthat::test_that("direct s3 methods execute for binary_alpha", {
   # build a small df and hit the .data.frame method directly -------------------
   .data <- rlang::.data
   df_small <- ps$data_long |>
-    dplyr::filter(.data$big_group == "kid_serum",
-                  .data$timepoint_factor %in% c("T2","T6")) |>
+    dplyr::filter(
+      .data$big_group == "kid_serum",
+      .data$timepoint_factor %in% c("T2", "T6")
+    ) |>
     dplyr::collect()
 
   res2 <- phiper:::compute_alpha_diversity(

@@ -54,20 +54,21 @@
 #'         Attributes include `table_name`, `time_mode`, `similarity`, and `mode`.
 #' @export
 compute_repertoire_similarity <- function(
-    x,
-    group_col,
-    time_col,
-    similarity = c("jaccard", "sorensen", "bray_curtis", "kulczynski", "phi", "pearson", "beta_sim"),
-    mode = c("within", "between", "all"),
-    dyade_col = NULL,
-    time_mode = c("reference", "pairwise"),
-    time_pairing = c("same", "cross"),
-    ref_time = c("earliest", "latest"),
-    subject_mode = c("self_or_dyad", "self", "all"),
-    drop_self_time = TRUE,
-    out_table = NULL,
-    overwrite = FALSE,
-    verbose = .ph_opt("verbose", TRUE)) {
+  x,
+  group_col,
+  time_col,
+  similarity = c("jaccard", "sorensen", "bray_curtis", "kulczynski", "phi", "pearson", "beta_sim"),
+  mode = c("within", "between", "all"),
+  dyade_col = NULL,
+  time_mode = c("reference", "pairwise"),
+  time_pairing = c("same", "cross"),
+  ref_time = c("earliest", "latest"),
+  subject_mode = c("self_or_dyad", "self", "all"),
+  drop_self_time = TRUE,
+  out_table = NULL,
+  overwrite = FALSE,
+  verbose = .ph_opt("verbose", TRUE)
+) {
   .ph_with_timing(
     headline = "Computing repertoire similarity (<phip_data>)",
     step = sprintf(
@@ -896,7 +897,6 @@ compute_repertoire_similarity <- function(
 }
 
 
-
 # ==============================================================================
 # Repertoire stability: plot (takes tibble from compute_*)
 # ==============================================================================
@@ -930,22 +930,23 @@ compute_repertoire_similarity <- function(
 #' @return A `ggplot` object.
 #' @export
 plot_repertoire_stability <- function(
-    stab_df,
-    custom_colors = NULL,
-    # smoothing / ribbons
-    continuous_mode = c("gam", "binned", "loess"),
-    gam_k = 7,
-    ci_method = c("model", "bootstrap"),
-    ci_level = 0.95,
-    boot_R = 500,
-    boot_seed = NULL,
-    boot_progress = TRUE,
-    # visuals
-    ci_fill = "grey70",
-    ci_alpha = 0.15,
-    point_alpha = 0.25,
-    # NEW: override fill colors for big baseline markers (named by group)
-    marker_fill_colors = NULL) {
+  stab_df,
+  custom_colors = NULL,
+  # smoothing / ribbons
+  continuous_mode = c("gam", "binned", "loess"),
+  gam_k = 7,
+  ci_method = c("model", "bootstrap"),
+  ci_level = 0.95,
+  boot_R = 500,
+  boot_seed = NULL,
+  boot_progress = TRUE,
+  # visuals
+  ci_fill = "grey70",
+  ci_alpha = 0.15,
+  point_alpha = 0.25,
+  # NEW: override fill colors for big baseline markers (named by group)
+  marker_fill_colors = NULL
+) {
   stopifnot(is.data.frame(stab_df))
   continuous_mode <- match.arg(continuous_mode)
   ci_method <- match.arg(ci_method)
@@ -1116,17 +1117,18 @@ plot_repertoire_stability <- function(
 #'         subjects=..., order_info=...)).
 #' @export
 ph_plot_stability_corr_heatmap <- function(
-    stab,
-    group = NULL,
-    min_times = 2,
-    method = c("pearson", "spearman"),
-    require_shared_times = TRUE,
-    sort_by_status = FALSE,
-    subject_meta = NULL,
-    pre_status_col = "status_t1",
-    post_status_col = "status_t2",
-    palette = "RdYlBu",
-    limits = c(-1, 1)) {
+  stab,
+  group = NULL,
+  min_times = 2,
+  method = c("pearson", "spearman"),
+  require_shared_times = TRUE,
+  sort_by_status = FALSE,
+  subject_meta = NULL,
+  pre_status_col = "status_t1",
+  post_status_col = "status_t2",
+  palette = "RdYlBu",
+  limits = c(-1, 1)
+) {
   method <- match.arg(method)
   .data <- rlang::.data
 

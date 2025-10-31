@@ -28,7 +28,6 @@ scatter_static <- function(df,
                            prefer_flags = TRUE,
                            color_by = NULL,
                            color_title = NULL) {
-
   # -- keep original so we can access prev_meta$peptide_library ---------------
   df_original <- df
 
@@ -49,22 +48,26 @@ scatter_static <- function(df,
         df <- df[df$rank %in% rank, , drop = FALSE]
       }
       if (!is.null(universe) && "group_col" %in% names(df)) {
-        gvec <- as.character(df$group_col); gvec[is.na(gvec)] <- ""
+        gvec <- as.character(df$group_col)
+        gvec[is.na(gvec)] <- ""
         if (isTRUE(universe_regex)) {
           keep <- rep(FALSE, nrow(df))
-          for (p in as.character(universe))
+          for (p in as.character(universe)) {
             keep <- keep | grepl(p, gvec, ignore.case = TRUE, perl = TRUE)
+          }
           df <- df[keep, , drop = FALSE]
         } else {
           df <- df[tolower(gvec) %in% tolower(as.character(universe)), , drop = FALSE]
         }
       }
       if (!is.null(features) && "feature" %in% names(df)) {
-        fvec <- as.character(df$feature); fvec[is.na(fvec)] <- ""
+        fvec <- as.character(df$feature)
+        fvec[is.na(fvec)] <- ""
         if (isTRUE(features_regex)) {
           keep <- rep(FALSE, nrow(df))
-          for (p in as.character(features))
+          for (p in as.character(features)) {
             keep <- keep | grepl(p, fvec, ignore.case = TRUE, perl = TRUE)
+          }
           df <- df[keep, , drop = FALSE]
         } else {
           df <- df[tolower(fvec) %in% tolower(as.character(features)), , drop = FALSE]
@@ -106,9 +109,9 @@ scatter_static <- function(df,
           category_raw = tolower(trimws(as.character(.data$category_rank_wbh %||% NA_character_))),
           category = dplyr::case_when(
             grepl("wbh", category_raw) & grepl("significant", category_raw) ~ "significant (wBH, per rank)",
-            grepl("nominal", category_raw)                                  ~ "nominal only",
-            grepl("not significant", category_raw)                          ~ "not significant",
-            TRUE                                                            ~ "not significant"
+            grepl("nominal", category_raw) ~ "nominal only",
+            grepl("not significant", category_raw) ~ "not significant",
+            TRUE ~ "not significant"
           )
         )
     } else {
@@ -116,25 +119,28 @@ scatter_static <- function(df,
         dplyr::mutate(
           category = dplyr::case_when(
             !is.na(.data$p_adj_rank_wbh) & .data$p_adj_rank_wbh <= alpha ~ "significant (wBH, per rank)",
-            !is.na(.data$p_raw)          & .data$p_raw          <= alpha ~ "nominal only",
+            !is.na(.data$p_raw) & .data$p_raw <= alpha ~ "nominal only",
             TRUE ~ "not significant"
           )
         )
     }
 
     # If there is only a single category, fall back to p-value bins for color
-    cat_levels <- c("significant (wBH, per rank)",
-                    "significant (BH, per rank)",
-                    "nominal only",
-                    "not significant")
+    cat_levels <- c(
+      "significant (wBH, per rank)",
+      "significant (BH, per rank)",
+      "nominal only",
+      "not significant"
+    )
     df$category <- factor(df$category, levels = cat_levels)
 
     if (length(stats::na.omit(unique(df$category))) <= 1L) {
       base_p <- if ("p_adj_rank_wbh" %in% names(df)) df$p_adj_rank_wbh else df$p_raw
       df$p_bin <- cut(base_p,
-                      breaks = c(0, 1e-3, 1e-2, 5e-2, 1, Inf),
-                      labels = c("≤1e-3", "(1e-3,1e-2]", "(1e-2,0.05]", ">0.05", "NA"),
-                      include.lowest = TRUE, right = TRUE)
+        breaks = c(0, 1e-3, 1e-2, 5e-2, 1, Inf),
+        labels = c("≤1e-3", "(1e-3,1e-2]", "(1e-2,0.05]", ">0.05", "NA"),
+        include.lowest = TRUE, right = TRUE
+      )
       color_var <- "p_bin"
       color_val_label <- "p-value"
     } else {
@@ -150,8 +156,9 @@ scatter_static <- function(df,
       df <- dplyr::mutate(df, pep_key = as.character(.data$peptide_id))
     } else if (all(c("feature", "rank") %in% names(df))) {
       df <- dplyr::mutate(df, pep_key = dplyr::if_else(.data$rank == "peptide_id",
-                                                       as.character(.data$feature),
-                                                       NA_character_))
+        as.character(.data$feature),
+        NA_character_
+      ))
     } else if ("feature" %in% names(df)) {
       df <- dplyr::mutate(df, pep_key = as.character(.data$feature))
     } else {
@@ -160,11 +167,16 @@ scatter_static <- function(df,
 
     has_any_keys <- any(!is.na(df$pep_key))
     if (has_any_keys) {
-      lib_handle <- tryCatch({
-        if (inherits(df_original, "ph_prev_result"))
-          attr(df_original, "prev_meta")$peptide_library
-        else NULL
-      }, error = function(...) NULL)
+      lib_handle <- tryCatch(
+        {
+          if (inherits(df_original, "ph_prev_result")) {
+            attr(df_original, "prev_meta")$peptide_library
+          } else {
+            NULL
+          }
+        },
+        error = function(...) NULL
+      )
 
       pm <- if (!is.null(lib_handle)) {
         lib_handle %>%
@@ -185,8 +197,12 @@ scatter_static <- function(df,
         df[[color_by]] <- vapply(
           df[[color_by]],
           function(z) {
-            if (length(z) == 0) return(NA_character_)
-            if (is.atomic(z)) return(as.character(z)[1])
+            if (length(z) == 0) {
+              return(NA_character_)
+            }
+            if (is.atomic(z)) {
+              return(as.character(z)[1])
+            }
             as.character(z[[1]])
           },
           character(1)
@@ -198,9 +214,9 @@ scatter_static <- function(df,
 
     if (is.logical(df[[color_by]])) {
       df[[color_by]] <- dplyr::case_when(
-        df[[color_by]] %in% TRUE  ~ "yes",
+        df[[color_by]] %in% TRUE ~ "yes",
         df[[color_by]] %in% FALSE ~ "no",
-        is.na(df[[color_by]])     ~ "na"
+        is.na(df[[color_by]]) ~ "na"
       )
     }
     df[[color_by]] <- as.factor(as.character(df[[color_by]]))
@@ -212,10 +228,10 @@ scatter_static <- function(df,
 
   # --- ensure ratio exists: derive from prop1/prop2 or create NA column -------
   if (!"ratio" %in% names(df)) {
-    if (all(c("prop1","prop2") %in% names(df))) {
+    if (all(c("prop1", "prop2") %in% names(df))) {
       prop1_eps <- ifelse(is.na(df$prop1) | df$prop1 <= 0, df$prop1 + 1e-12, df$prop1)
       prop2_eps <- ifelse(is.na(df$prop2) | df$prop2 <= 0, df$prop2 + 1e-12, df$prop2)
-      df$ratio  <- prop1_eps / prop2_eps
+      df$ratio <- prop1_eps / prop2_eps
     } else {
       df$ratio <- NA_real_
     }
@@ -283,22 +299,23 @@ scatter_static <- function(df,
 #'         If facet_pairs=FALSE: for each rank a sub-list of plots per (group1 vs group2).
 #' @export
 ph_volcano <- function(
-    comparison_tbl,
-    ranks = NULL,
-    facet_pairs = TRUE,
-    facet_nrow = NULL,
-    facet_ncol = NULL,
-    sparse_rank = NULL,
-    sparse_drop_pct = 0,
-    sparse_seed = NULL,
-    fc_cut = 1,
-    p_cut = 0.05,
-    significant_colors = c(
-      "not significant"                 = "#386cb0",
-      "significant prior correction"    = "#1b9e77",
-      "significant post FDR correction" = "#e31a1c"
-    ),
-    interactive = TRUE) {
+  comparison_tbl,
+  ranks = NULL,
+  facet_pairs = TRUE,
+  facet_nrow = NULL,
+  facet_ncol = NULL,
+  sparse_rank = NULL,
+  sparse_drop_pct = 0,
+  sparse_seed = NULL,
+  fc_cut = 1,
+  p_cut = 0.05,
+  significant_colors = c(
+    "not significant"                 = "#386cb0",
+    "significant prior correction"    = "#1b9e77",
+    "significant post FDR correction" = "#e31a1c"
+  ),
+  interactive = TRUE
+) {
   .ph_with_timing(
     headline = "make_interactive_volcano",
     expr = {
@@ -383,12 +400,12 @@ ph_volcano <- function(
               drop_idx <- sample(pool_idx, size = n_drop, replace = FALSE)
               df <- df[-drop_idx, , drop = FALSE]
               .ph_log_info("Downsampled 'not significant' rows",
-                           bullets = c(
-                             paste0("rank: ", sparse_rank),
-                             paste0("pool: ", n_pool),
-                             paste0("dropped: ", n_drop),
-                             paste0("kept: ", n_pool - n_drop)
-                           )
+                bullets = c(
+                  paste0("rank: ", sparse_rank),
+                  paste0("pool: ", n_pool),
+                  paste0("dropped: ", n_drop),
+                  paste0("kept: ", n_pool - n_drop)
+                )
               )
             }
           }
@@ -441,8 +458,8 @@ ph_volcano <- function(
 
         if (facet_pairs) {
           base <- base + ggplot2::facet_wrap(~pair_label,
-                                             scales = "fixed",
-                                             nrow = facet_nrow, ncol = facet_ncol
+            scales = "fixed",
+            nrow = facet_nrow, ncol = facet_ncol
           )
           if (interactive) {
             p <- plotly::ggplotly(base, tooltip = c("text", "x", "y"))
@@ -580,7 +597,6 @@ scatter_interactive <- function(df,
                                 prefer_flags = TRUE,
                                 color_by = NULL,
                                 color_title = NULL) {
-
   # -- keep original to access prev_meta (peptide library handle) -------------
   df_original <- df
 
@@ -602,7 +618,8 @@ scatter_interactive <- function(df,
         df <- df[df$rank %in% rank, , drop = FALSE]
       }
       if (!is.null(universe) && "group_col" %in% names(df)) {
-        gvec <- as.character(df$group_col); gvec[is.na(gvec)] <- ""
+        gvec <- as.character(df$group_col)
+        gvec[is.na(gvec)] <- ""
         if (universe_regex) {
           keep <- rep(FALSE, nrow(df))
           for (p in as.character(universe)) keep <- keep | grepl(p, gvec, ignore.case = TRUE, perl = TRUE)
@@ -612,7 +629,8 @@ scatter_interactive <- function(df,
         }
       }
       if (!is.null(features) && "feature" %in% names(df)) {
-        fvec <- as.character(df$feature); fvec[is.na(fvec)] <- ""
+        fvec <- as.character(df$feature)
+        fvec[is.na(fvec)] <- ""
         if (features_regex) {
           keep <- rep(FALSE, nrow(df))
           for (p in as.character(features)) keep <- keep | grepl(p, fvec, ignore.case = TRUE, perl = TRUE)
@@ -631,8 +649,10 @@ scatter_interactive <- function(df,
     p <- plotly::plot_ly()
     return(plotly::layout(
       p,
-      annotations = list(x = 0.5, y = 0.5, text = "no data for this contrast",
-                         showarrow = FALSE, xref = "paper", yref = "paper"),
+      annotations = list(
+        x = 0.5, y = 0.5, text = "no data for this contrast",
+        showarrow = FALSE, xref = "paper", yref = "paper"
+      ),
       xaxis = list(title = xlab %||% "group a", zeroline = FALSE),
       yaxis = list(title = ylab %||% "group b", zeroline = FALSE),
       legend = list(orientation = "h", y = -0.15)
@@ -655,9 +675,9 @@ scatter_interactive <- function(df,
         category_raw = tolower(trimws(as.character(.data$category_rank_wbh %||% NA_character_))),
         category = dplyr::case_when(
           grepl("wbh", category_raw) & grepl("significant", category_raw) ~ cat_levels[1],
-          grepl("nominal", category_raw)                                  ~ cat_levels[2],
-          grepl("not significant", category_raw)                          ~ cat_levels[3],
-          TRUE                                                            ~ "other/NA"
+          grepl("nominal", category_raw) ~ cat_levels[2],
+          grepl("not significant", category_raw) ~ cat_levels[3],
+          TRUE ~ "other/NA"
         ),
         category = factor(category, levels = c(cat_levels, "other/NA"))
       )
@@ -673,8 +693,9 @@ scatter_interactive <- function(df,
       df <- dplyr::mutate(df, pep_key = as.character(.data$peptide_id))
     } else if (all(c("feature", "rank") %in% names(df))) {
       df <- dplyr::mutate(df, pep_key = dplyr::if_else(.data$rank == "peptide_id",
-                                                       as.character(.data$feature),
-                                                       NA_character_))
+        as.character(.data$feature),
+        NA_character_
+      ))
     } else if ("feature" %in% names(df)) {
       df <- dplyr::mutate(df, pep_key = as.character(.data$feature))
     } else {
@@ -714,8 +735,12 @@ scatter_interactive <- function(df,
         df[[color_by]] <- vapply(
           df[[color_by]],
           function(z) {
-            if (length(z) == 0) return(NA_character_)
-            if (is.atomic(z)) return(as.character(z)[1])
+            if (length(z) == 0) {
+              return(NA_character_)
+            }
+            if (is.atomic(z)) {
+              return(as.character(z)[1])
+            }
             as.character(z[[1]])
           },
           character(1)
@@ -728,9 +753,9 @@ scatter_interactive <- function(df,
     # normalize logicals and coerce to factor (atomic)
     if (is.logical(df[[color_by]])) {
       df[[color_by]] <- dplyr::case_when(
-        df[[color_by]] %in% TRUE  ~ "yes",
+        df[[color_by]] %in% TRUE ~ "yes",
         df[[color_by]] %in% FALSE ~ "no",
-        is.na(df[[color_by]])     ~ "na"
+        is.na(df[[color_by]]) ~ "na"
       )
     }
     df[[color_by]] <- as.factor(as.character(df[[color_by]]))
@@ -742,10 +767,10 @@ scatter_interactive <- function(df,
 
   # --- ensure ratio exists: derive from prop1/prop2 or create NA column -------
   if (!"ratio" %in% names(df)) {
-    if (all(c("prop1","prop2") %in% names(df))) {
+    if (all(c("prop1", "prop2") %in% names(df))) {
       prop1_eps <- ifelse(is.na(df$prop1) | df$prop1 <= 0, df$prop1 + 1e-12, df$prop1)
       prop2_eps <- ifelse(is.na(df$prop2) | df$prop2 <= 0, df$prop2 + 1e-12, df$prop2)
-      df$ratio  <- prop1_eps / prop2_eps
+      df$ratio <- prop1_eps / prop2_eps
     } else {
       df$ratio <- NA_real_
     }
@@ -754,16 +779,16 @@ scatter_interactive <- function(df,
   # ---------- (c) hover fields and numerics ----------------------------------
   df <- df %>%
     dplyr::mutate(
-      p1r  = round(.data$percent1, 2),
-      p2r  = round(.data$percent2, 2),
-      rr   = dplyr::coalesce(round(.data$ratio, 2), NA_real_),
+      p1r = round(.data$percent1, 2),
+      p2r = round(.data$percent2, 2),
+      rr = dplyr::coalesce(round(.data$ratio, 2), NA_real_),
       praw = round(.data$p_raw, 3),
       padj_wbh = round(.data$p_adj_rank_wbh, 3),
-      padj_bh  = if ("p_adj_rank" %in% names(df)) round(.data$p_adj_rank, 3) else NA_real_,
+      padj_bh = if ("p_adj_rank" %in% names(df)) round(.data$p_adj_rank, 3) else NA_real_,
       padj_bh_str = ifelse(is.na(.data$padj_bh), "NA", sprintf("%.3f", .data$padj_bh)),
       npep = dplyr::coalesce(
         if ("n_peptides" %in% names(df)) .data[["n_peptides"]] else NULL,
-        if ("n_peptide"  %in% names(df)) .data[["n_peptide" ]] else NULL
+        if ("n_peptide" %in% names(df)) .data[["n_peptide"]] else NULL
       ),
       color_info = if (!is.null(color_var)) as.character(.data[[color_var]]) else NA_character_
     )
@@ -901,30 +926,30 @@ scatter_interactive <- function(df,
 #' @export
 # ==============================================================================
 ph_volcano <- function(
-    comparison_tbl,
-    ranks = NULL,
-    pair = NULL,
-    universe = NULL,
-    features = NULL,
-    features_regex = FALSE,
-    universe_regex = FALSE,
-    color_by = NULL,
-    color_title = NULL,
-    facet_pairs = TRUE,
-    facet_nrow = NULL,
-    facet_ncol = NULL,
-    sparse_rank = NULL,
-    sparse_drop_pct = 0,
-    sparse_seed = NULL,
-    fc_cut = 1,
-    p_cut = 0.05,
-    p_mode = c("raw","bh","wbh"),
-    significant_colors = c(
-      "not significant"                 = "#386cb0",
-      "significant prior correction"    = "#1b9e77",
-      "significant post fdr correction" = "#e31a1c"
-    ),
-    interactive = TRUE
+  comparison_tbl,
+  ranks = NULL,
+  pair = NULL,
+  universe = NULL,
+  features = NULL,
+  features_regex = FALSE,
+  universe_regex = FALSE,
+  color_by = NULL,
+  color_title = NULL,
+  facet_pairs = TRUE,
+  facet_nrow = NULL,
+  facet_ncol = NULL,
+  sparse_rank = NULL,
+  sparse_drop_pct = 0,
+  sparse_seed = NULL,
+  fc_cut = 1,
+  p_cut = 0.05,
+  p_mode = c("raw", "bh", "wbh"),
+  significant_colors = c(
+    "not significant"                 = "#386cb0",
+    "significant prior correction"    = "#1b9e77",
+    "significant post fdr correction" = "#e31a1c"
+  ),
+  interactive = TRUE
 ) {
   p_mode <- match.arg(p_mode)
 
@@ -946,7 +971,8 @@ ph_volcano <- function(
         df <- df[df$rank %in% ranks, , drop = FALSE]
       }
       if (!is.null(universe) && "group_col" %in% names(df)) {
-        gvec <- as.character(df$group_col); gvec[is.na(gvec)] <- ""
+        gvec <- as.character(df$group_col)
+        gvec[is.na(gvec)] <- ""
         if (universe_regex) {
           keep <- rep(FALSE, nrow(df))
           for (p in as.character(universe)) keep <- keep | grepl(p, gvec, ignore.case = TRUE, perl = TRUE)
@@ -956,7 +982,8 @@ ph_volcano <- function(
         }
       }
       if (!is.null(features) && "feature" %in% names(df)) {
-        fvec <- as.character(df$feature); fvec[is.na(fvec)] <- ""
+        fvec <- as.character(df$feature)
+        fvec[is.na(fvec)] <- ""
         if (features_regex) {
           keep <- rep(FALSE, nrow(df))
           for (p in as.character(features)) keep <- keep | grepl(p, fvec, ignore.case = TRUE, perl = TRUE)
@@ -971,31 +998,38 @@ ph_volcano <- function(
     if (!is.null(ranks) && "rank" %in% names(df)) df <- df[df$rank %in% ranks, , drop = FALSE]
   }
 
-  if (is.null(df) || !nrow(df)) return(invisible(list()))
+  if (is.null(df) || !nrow(df)) {
+    return(invisible(list()))
+  }
 
   # ---------- (1) required columns, minimal coercions ------------------------
-  req <- c("rank","feature","group1","group2")
+  req <- c("rank", "feature", "group1", "group2")
   miss <- setdiff(req, names(df))
   if (length(miss)) stop("ph_volcano: missing required columns: ", paste(miss, collapse = ", "))
 
-  df$rank    <- as.character(df$rank)
+  df$rank <- as.character(df$rank)
   df$feature <- as.character(df$feature)
-  df$group1  <- as.character(df$group1)
-  df$group2  <- as.character(df$group2)
+  df$group1 <- as.character(df$group1)
+  df$group2 <- as.character(df$group2)
   if (!"group_col" %in% names(df)) df$group_col <- NA_character_
   df$pair_label <- paste0(df$group1, " vs ", df$group2)
 
   # ---------- (2) ensure ratio exists (fallback from prop1/prop2) ------------
   if (!"ratio" %in% names(df)) {
-    if (!all(c("prop1","prop2") %in% names(df)))
+    if (!all(c("prop1", "prop2") %in% names(df))) {
       stop("ph_volcano: need either 'ratio' or both 'prop1' and 'prop2'.")
+    }
     p1 <- ifelse(is.na(df$prop1) | df$prop1 <= 0, df$prop1 + 1e-12, df$prop1)
     p2 <- ifelse(is.na(df$prop2) | df$prop2 <= 0, df$prop2 + 1e-12, df$prop2)
     df$ratio <- p1 / p2
   }
 
   # ---------- (3) choose p column and compute axes ---------------------------
-  p_col <- switch(p_mode, raw = "p_raw", bh = "p_adj_rank", wbh = "p_adj_rank_wbh")
+  p_col <- switch(p_mode,
+    raw = "p_raw",
+    bh = "p_adj_rank",
+    wbh = "p_adj_rank_wbh"
+  )
   if (!p_col %in% names(df)) stop("ph_volcano: requested p_mode='", p_mode, "' but column '", p_col, "' not found.")
   df$log2ratio <- log2(df$ratio)
   p_use <- pmax(df[[p_col]], .Machine$double.xmin)
@@ -1006,22 +1040,28 @@ ph_volcano <- function(
     if ("category_rank_wbh" %in% names(df)) {
       raw <- tolower(trimws(as.character(df$category_rank_wbh)))
       cat_use <- ifelse(grepl("significant", raw) & grepl("wbh", raw),
-                        "significant post fdr correction",
-                        ifelse(grepl("nominal", raw),
-                               "significant prior correction",
-                               "not significant"))
+        "significant post fdr correction",
+        ifelse(grepl("nominal", raw),
+          "significant prior correction",
+          "not significant"
+        )
+      )
     } else {
-      rawp  <- if ("p_raw" %in% names(df)) df$p_raw else p_use
+      rawp <- if ("p_raw" %in% names(df)) df$p_raw else p_use
       sigfc <- abs(df$log2ratio) >= fc_cut
-      post  <- (p_use <= p_cut) & sigfc
-      prior <- (rawp  <= p_cut) & sigfc & !post
-      cat_use <- ifelse(post,  "significant post fdr correction",
-                        ifelse(prior,"significant prior correction","not significant"))
+      post <- (p_use <= p_cut) & sigfc
+      prior <- (rawp <= p_cut) & sigfc & !post
+      cat_use <- ifelse(post, "significant post fdr correction",
+        ifelse(prior, "significant prior correction", "not significant")
+      )
     }
     df$category_use <- factor(cat_use,
-                              levels = c("significant post fdr correction",
-                                         "significant prior correction",
-                                         "not significant"))
+      levels = c(
+        "significant post fdr correction",
+        "significant prior correction",
+        "not significant"
+      )
+    )
   }
 
   # ---------- (5) color by peptide metadata (use saved library handle) -------
@@ -1030,7 +1070,7 @@ ph_volcano <- function(
   if (!is.null(color_by)) {
     if ("peptide_id" %in% names(df)) {
       df$pep_key <- as.character(df$peptide_id)
-    } else if (all(c("feature","rank") %in% names(df))) {
+    } else if (all(c("feature", "rank") %in% names(df))) {
       df$pep_key <- ifelse(df$rank == "peptide_id", as.character(df$feature), NA_character_)
     } else if ("feature" %in% names(df)) {
       df$pep_key <- as.character(df$feature)
@@ -1053,8 +1093,12 @@ ph_volcano <- function(
           df[[color_by]] <- vapply(
             df[[color_by]],
             function(z) {
-              if (length(z) == 0) return(NA_character_)
-              if (is.atomic(z)) return(as.character(z)[1])
+              if (length(z) == 0) {
+                return(NA_character_)
+              }
+              if (is.atomic(z)) {
+                return(as.character(z)[1])
+              }
               as.character(z[[1]])
             },
             character(1)
@@ -1062,9 +1106,9 @@ ph_volcano <- function(
         }
         if (is.logical(df[[color_by]])) {
           df[[color_by]] <- dplyr::case_when(
-            df[[color_by]] %in% TRUE  ~ "Yes",
+            df[[color_by]] %in% TRUE ~ "Yes",
             df[[color_by]] %in% FALSE ~ "No",
-            is.na(df[[color_by]])     ~ "NA"
+            is.na(df[[color_by]]) ~ "NA"
           )
         }
       } else {
@@ -1075,7 +1119,7 @@ ph_volcano <- function(
     }
 
     df[[color_by]] <- as.factor(as.character(df[[color_by]]))
-    color_var   <- color_by
+    color_var <- color_by
     color_label <- if (is.null(color_title)) color_by else color_title
   }
 
@@ -1083,7 +1127,7 @@ ph_volcano <- function(
   if (!is.null(sparse_rank) && sparse_drop_pct > 0) {
     if (sparse_rank %in% unique(df$rank)) {
       pool_idx <- which(df$rank == sparse_rank &
-                          (if (is.null(color_var)) df$category_use == "not significant" else TRUE))
+        (if (is.null(color_var)) df$category_use == "not significant" else TRUE))
       if (length(pool_idx)) {
         if (!is.null(sparse_seed)) set.seed(as.integer(sparse_seed))
         n_drop <- floor(sparse_drop_pct * length(pool_idx))
@@ -1102,9 +1146,11 @@ ph_volcano <- function(
     hov <- sprintf(
       "<b>%s</b><br>rank: %s<br>pair: %s vs %s<br>log2(ratio): %.3f<br>-log10(p): %.3f%s",
       dd$feature, dd$rank, dd$group1, dd$group2, dd$log2ratio, dd$nlog10p,
-      if (!is.null(color_var))
+      if (!is.null(color_var)) {
         sprintf("<br>%s: %s", color_label, as.character(dd[[color_var]]))
-      else ""
+      } else {
+        ""
+      }
     )
 
     # color mapping (meta or categories)
@@ -1115,7 +1161,8 @@ ph_volcano <- function(
     } else {
       pal <- significant_colors
       cat_vec <- as.character(dd$category_use)
-      col_vec <- pal[cat_vec]; col_vec[is.na(col_vec)] <- pal[["not significant"]]
+      col_vec <- pal[cat_vec]
+      col_vec[is.na(col_vec)] <- pal[["not significant"]]
     }
 
     p <- plotly::plot_ly(
@@ -1128,14 +1175,22 @@ ph_volcano <- function(
     )
 
     # thresholds
-    p <- plotly::add_segments(p, x = -Inf, xend = Inf, y = -log10(p_cut), yend = -log10(p_cut),
-                              inherit = FALSE, showlegend = FALSE)
-    p <- plotly::add_segments(p, x =  fc_cut, xend =  fc_cut, y = -Inf, yend = Inf,
-                              inherit = FALSE, showlegend = FALSE)
-    p <- plotly::add_segments(p, x = -fc_cut, xend = -fc_cut, y = -Inf, yend = Inf,
-                              inherit = FALSE, showlegend = FALSE)
-    p <- plotly::add_segments(p, x = 0, xend = 0, y = -Inf, yend = Inf,
-                              inherit = FALSE, showlegend = FALSE)
+    p <- plotly::add_segments(p,
+      x = -Inf, xend = Inf, y = -log10(p_cut), yend = -log10(p_cut),
+      inherit = FALSE, showlegend = FALSE
+    )
+    p <- plotly::add_segments(p,
+      x = fc_cut, xend = fc_cut, y = -Inf, yend = Inf,
+      inherit = FALSE, showlegend = FALSE
+    )
+    p <- plotly::add_segments(p,
+      x = -fc_cut, xend = -fc_cut, y = -Inf, yend = Inf,
+      inherit = FALSE, showlegend = FALSE
+    )
+    p <- plotly::add_segments(p,
+      x = 0, xend = 0, y = -Inf, yend = Inf,
+      inherit = FALSE, showlegend = FALSE
+    )
 
     ttl <- paste0("rank: ", unique(dd$rank))
     if (!is.null(title_suffix)) ttl <- paste0(ttl, " • ", title_suffix)
@@ -1182,10 +1237,14 @@ ph_volcano <- function(
   }
 
   # ---------- (8) compose output per rank ------------------------------------
-  out <- vector("list", length(by_rank)); names(out) <- names(by_rank)
+  out <- vector("list", length(by_rank))
+  names(out) <- names(by_rank)
   for (rk in names(by_rank)) {
     dr <- by_rank[[rk]]
-    if (!nrow(dr)) { out[[rk]] <- NULL; next }
+    if (!nrow(dr)) {
+      out[[rk]] <- NULL
+      next
+    }
     pieces <- split(dr, dr$pair_label, drop = TRUE)
 
     if (isTRUE(facet_pairs)) {
@@ -1194,15 +1253,21 @@ ph_volcano <- function(
         function(lbl) if (interactive) build_one_plotly(pieces[[lbl]], lbl) else build_one_gg(pieces[[lbl]], lbl)
       )
       n <- length(plots)
-      r <- facet_nrow; c <- facet_ncol
-      if (is.null(r) && is.null(c)) { r <- floor(sqrt(n)); c <- ceiling(n / max(1, r)) }
-      else if (is.null(r))         { r <- ceiling(n / max(1, c)) }
-      else if (is.null(c))         { c <- ceiling(n / max(1, r)) }
+      r <- facet_nrow
+      c <- facet_ncol
+      if (is.null(r) && is.null(c)) {
+        r <- floor(sqrt(n))
+        c <- ceiling(n / max(1, r))
+      } else if (is.null(r)) {
+        r <- ceiling(n / max(1, c))
+      } else if (is.null(c)) {
+        c <- ceiling(n / max(1, r))
+      }
 
       out[[rk]] <- if (interactive) {
         plotly::subplot(plots, nrows = r, shareX = TRUE, shareY = TRUE, titleX = TRUE, titleY = TRUE, margin = 0.03)
       } else {
-        plots  # return list of ggplots; caller can arrange
+        plots # return list of ggplots; caller can arrange
       }
     } else {
       lst <- lapply(

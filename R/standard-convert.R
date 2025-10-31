@@ -90,20 +90,21 @@
 #' @export
 
 phip_convert <- function(
-    data_long_path,
-    sample_id = NULL,
-    peptide_id = NULL,
-    subject_id = NULL,
-    timepoint = NULL,
-    exist = NULL,
-    fold_change = NULL,
-    counts_input = NULL,
-    counts_hit = NULL,
-    backend = "duckdb",
-    n_cores = 8,
-    materialise_table = TRUE,
-    auto_expand = FALSE,
-    peptide_library = TRUE) {
+  data_long_path,
+  sample_id = NULL,
+  peptide_id = NULL,
+  subject_id = NULL,
+  timepoint = NULL,
+  exist = NULL,
+  fold_change = NULL,
+  counts_input = NULL,
+  counts_hit = NULL,
+  backend = "duckdb",
+  n_cores = 8,
+  materialise_table = TRUE,
+  auto_expand = FALSE,
+  peptide_library = TRUE
+) {
   # ------------------------------------------------------------------
   # 1. db-backend: default to "duckdb" if user supplies nothing
   # ------------------------------------------------------------------

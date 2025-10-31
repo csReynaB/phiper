@@ -204,9 +204,9 @@ compute_alpha_diversity.phip_data <- function(x,
           inter_col <- "..phip_interaction.."
           combo_nm <- paste(group_cols, collapse = interaction_sep)
           tbl_inter <- dplyr::mutate(tbl, !!rlang::sym(inter_col) :=
-                                       paste(!!!rlang::syms(group_cols),
-                                             sep = interaction_sep
-                                       ))
+            paste(!!!rlang::syms(group_cols),
+              sep = interaction_sep
+            ))
           out_list[[combo_nm]] <-
             .compute_alpha_for_group(
               tbl_inter,
@@ -312,9 +312,9 @@ compute_alpha_diversity.data.frame <- function(x,
           inter_col <- "..phip_interaction.."
           combo_nm <- paste(group_cols, collapse = interaction_sep)
           tbl_inter <- dplyr::mutate(tbl, !!rlang::sym(inter_col) :=
-                                       paste(!!!rlang::syms(group_cols),
-                                             sep = interaction_sep
-                                       ))
+            paste(!!!rlang::syms(group_cols),
+              sep = interaction_sep
+            ))
           out_list[[combo_nm]] <-
             .compute_alpha_for_group(
               tbl_inter,
@@ -346,9 +346,9 @@ compute_alpha_diversity.data.frame <- function(x,
 .phip_ln_base <- function(shannon_log = c("ln", "log2", "log10")) {
   shannon_log <- match.arg(shannon_log)
   switch(shannon_log,
-         ln    = 1.0,
-         log2  = log(2),
-         log10 = log(10)
+    ln    = 1.0,
+    log2  = log(2),
+    log10 = log(10)
   )
 }
 
@@ -426,7 +426,9 @@ compute_alpha_diversity.data.frame <- function(x,
         )
     } else {
       map_tbl <- map_provider(rank_name)
-      if (is.null(map_tbl)) return(NULL)
+      if (is.null(map_tbl)) {
+        return(NULL)
+      }
 
       ranked <- pres_min |>
         dplyr::inner_join(map_tbl, by = "peptide_id") |>

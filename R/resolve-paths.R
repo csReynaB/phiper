@@ -35,22 +35,23 @@
 #' @keywords internal
 
 .resolve_paths <- function(
-    exist_file = NULL,
-    fold_change_file = NULL,
-    samples_file = NULL,
-    input_file = NULL,
-    hit_file = NULL,
-    timepoints_file = NULL,
-    extra_cols = NULL,
-    comparisons_file = NULL,
-    output_dir = NULL, # deprecated
-    data_long_path = NULL,
-    backend = NULL,
-    peptide_library = TRUE,
-    n_cores = NULL,
-    materialise_table = NULL,
-    auto_expand = NULL,
-    config_yaml = NULL) {
+  exist_file = NULL,
+  fold_change_file = NULL,
+  samples_file = NULL,
+  input_file = NULL,
+  hit_file = NULL,
+  timepoints_file = NULL,
+  extra_cols = NULL,
+  comparisons_file = NULL,
+  output_dir = NULL, # deprecated
+  data_long_path = NULL,
+  backend = NULL,
+  peptide_library = TRUE,
+  n_cores = NULL,
+  materialise_table = NULL,
+  auto_expand = NULL,
+  config_yaml = NULL
+) {
   ## ------------------------------------------------------------------------ ##
   ## 1.  locate base directory & read yaml (if any provided)                  ##
   ## ------------------------------------------------------------------------ ##

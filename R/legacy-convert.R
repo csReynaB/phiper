@@ -95,20 +95,21 @@
 #' @export
 
 phip_convert_legacy <- function(
-    exist_file = NULL,
-    fold_change_file = NULL,
-    samples_file = NULL,
-    input_file = NULL,
-    hit_file = NULL,
-    timepoints_file = NULL,
-    extra_cols = NULL,
-    comparisons_file = NULL,
-    output_dir = NULL, # hard deprecation
-    backend = NULL,
-    peptide_library = TRUE,
-    n_cores = 8,
-    materialise_table = TRUE,
-    config_yaml = NULL) {
+  exist_file = NULL,
+  fold_change_file = NULL,
+  samples_file = NULL,
+  input_file = NULL,
+  hit_file = NULL,
+  timepoints_file = NULL,
+  extra_cols = NULL,
+  comparisons_file = NULL,
+  output_dir = NULL, # hard deprecation
+  backend = NULL,
+  peptide_library = TRUE,
+  n_cores = 8,
+  materialise_table = TRUE,
+  config_yaml = NULL
+) {
   #' @importFrom rlang .data
 
   # ------------------------------------------------------------------
