@@ -130,7 +130,8 @@ ph_prevalence_shift2 <- function(
     # STREAM/LOG — new arguments
     stream_path          = NULL,          # path to RDS multi-object stream (serialize() appends)
     return_results       = TRUE,          # read back the stream and return tibble
-    append_stream        = FALSE          # if TRUE, don't re-init header in stream
+    append_stream        = FALSE,          # if TRUE, don't re-init header in stream
+    fold_change          = c("none","sum","mean","max","median")
 ) {
 
   # --- 0) Argument validation ----------------------------------------------------
@@ -138,10 +139,12 @@ ph_prevalence_shift2 <- function(
   chk::chk_character(group_cols); chk::chk_true(length(group_cols) >= 1)
   chk::chk_string(exist_col)
   chk::chk_number(B_permutations); chk::chk_true(B_permutations >= 100)
+  fold_change <- match.arg(fold_change)
 
   # --- 1) Prepare data once ------------------------------------------------------
   # Required columns from `x`
-  need_cols <- c("sample_id","subject_id","peptide_id", exist_col, group_cols)
+  need_cols <- c("sample_id","subject_id","peptide_id", exist_col, group_cols,
+                 "fold_change")
   if (inherits(x, "phip_data")) {
     df_long <- x$data_long |>
       dplyr::select(tidyselect::any_of(need_cols))
@@ -554,6 +557,39 @@ ph_prevalence_shift2 <- function(
     )
     if (is.null(res)) return(NULL)
 
+    # ---- optional fold_change summary (lazy-safe) ----
+    fc_val <- NA_real_
+    if (!identical(fold_change, "none")) {
+      # peptide IDs in this stratum:
+      pep_ids_here <- names(pep_col_map)[pep_cols]
+
+      # subjects in this contrast (both groups):
+      subj_rows_both <- c(g1_rows, g2_rows)
+      subj_ids_here  <- subjects_order[unique(subj_rows_both)]
+
+      # lazy filter; if fold_change column is absent, this select will drop it silently
+      fc_tbl <- df_long |>
+        dplyr::filter(.data$peptide_id %in% pep_ids_here,
+                      .data$subject_id %in% subj_ids_here) |>
+        dplyr::select(tidyselect::any_of(c("fold_change")))   # no schema probing
+
+      # summarize only if fold_change actually flowed through
+      if ("fold_change" %in% names(fc_tbl)) {
+        # Prefer DB-side summarize; for 'median' fall back to R if backend lacks it
+        if (fold_change == "sum")   fc_tbl <- dplyr::summarise(fc_tbl, v = sum(.data$fold_change, na.rm = TRUE))
+        if (fold_change == "mean")  fc_tbl <- dplyr::summarise(fc_tbl, v = mean(.data$fold_change, na.rm = TRUE))
+        if (fold_change == "max")   fc_tbl <- dplyr::summarise(fc_tbl, v = max(.data$fold_change, na.rm = TRUE))
+        if (fold_change == "median") {
+          # dbplyr->DuckDB supports median; if not, collect minimal vector
+          fc_try <- try(dplyr::summarise(fc_tbl, v = median(.data$fold_change, na.rm = TRUE)), silent = TRUE)
+          fc_tbl <- if (inherits(fc_try, "try-error")) {
+            tibble::tibble(v = stats::median(dplyr::collect(fc_tbl)$fold_change, na.rm = TRUE))
+          } else fc_try
+        }
+        fc_val <- dplyr::pull(dplyr::collect(fc_tbl), v)[1] %||% NA_real_
+      }
+    }
+
     row <- dplyr::bind_cols(
       st[, c("rank","feature","group_col","group1","group2","design")],
       tibble::tibble(
@@ -566,7 +602,8 @@ ph_prevalence_shift2 <- function(
         mean_delta        = as.numeric(res$mean_delta),
         frac_delta_pos    = as.numeric(res$frac_delta_pos),
         mean_delta_w      = as.numeric(res$mean_delta_w),
-        frac_delta_pos_w  = as.numeric(res$frac_delta_pos_w)
+        frac_delta_pos_w  = as.numeric(res$frac_delta_pos_w),
+        !!paste0("fold_change_", fold_change) := fc_val
       )
     )
 
@@ -724,6 +761,7 @@ ph_prevalence_shift2 <- function(
       T_obs, p_perm, b,
       p_adj_rank,
       mean_delta, frac_delta_pos, mean_delta_w, frac_delta_pos_w,
+      dplyr::any_of(paste0("fold_change_", fold_change)),
       category_rank_bh
     ) %>%
     dplyr::arrange(rank, feature, group_col, group1, group2)
