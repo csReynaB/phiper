@@ -466,14 +466,15 @@ ph_prevalence_compare <- function(x,
                                   weight_mode = c("peptide_count", "none"),
                                   parallel = NULL,
                                   compute_ratios_db = TRUE,
-                                  interaction = FALSE,
-                                  combine_cols = NULL,
-                                  interaction_sep = "::",
-                                  collect = TRUE,
-                                  register_name = NULL,
-                                  # ---- new arguments ----
-                                  pop_k_min = 1L,
-                                  paired = FALSE) {
+                                  interaction       = FALSE,
+                                  combine_cols      = NULL,
+                                  interaction_sep   = "::",
+                                  collect           = TRUE,
+                                  register_name     = NULL,
+                                  pop_k_min         = 1L,
+                                  paired            = FALSE,
+                                  peptide_library   = NULL) {
+
   weight_mode <- match.arg(weight_mode)
 
   .ph_with_timing(
@@ -484,6 +485,11 @@ ph_prevalence_compare <- function(x,
       .q <- function(con, nm) as.character(DBI::dbQuoteIdentifier(con, nm))
       .sym <- rlang::sym
       chunk_n <- getOption("phiper.prev.chunk", 1e6L)
+
+      # --- choose library handle: explicit arg > x$peptide_library > x$meta$peptide_library
+      lib_handle <- peptide_library %||%
+        tryCatch(x$peptide_library, error = function(...) NULL) %||%
+        tryCatch(x$meta$peptide_library, error = function(...) NULL)
 
       # ---- basic checks / logging -------------------------------------------
       tryCatch(
@@ -499,7 +505,7 @@ ph_prevalence_compare <- function(x,
         error = function(e) .ph_abort("invalid arguments", bullets = e$message)
       )
 
-      # paired: FALSE lub nazwa kolumny
+      # paired: FALSE or single column name
       paired_col <- NULL
       if (!identical(paired, FALSE)) {
         if (!chk::vld_string(paired)) .ph_abort("paired must be FALSE or a single column name (string).")
@@ -576,34 +582,63 @@ ph_prevalence_compare <- function(x,
         }
       }
 
-      # ---- connection --------------------------------------------------------
+      # ---- connection (data.frame-friendly) ---------------------------------
       con <- NULL
       if (inherits(x, "phip_data")) con <- tryCatch(x$meta$con, error = function(...) NULL)
       if (is.null(con) && inherits(df_long, "tbl_sql")) con <- dbplyr::remote_con(df_long)
-      if (is.null(con)) .ph_abort("no duckdb connection found. use <phip_data>$meta$con or a duckdb-backed tbl_sql.")
-      view_const <- if (inherits(x, "phip_data")) attr(x, "view") %||% (x$meta$view %||% NA_character_) else NA_character_
 
-      # ---- peptide library handle -------------------------------------------
-      lib_handle <- NULL
-      lib_handle <- tryCatch(x$peptide_library, error = function(...) NULL)
-      if (is.null(lib_handle)) lib_handle <- tryCatch(x$meta$peptide_library, error = function(...) NULL)
+      if (is.null(con)) {
+        if (!requireNamespace("duckdb", quietly = TRUE)) {
+          .ph_abort("no duckdb connection found and package {duckdb} is not installed.")
+        }
+        con <- DBI::dbConnect(duckdb::duckdb(), dbdir = ":memory:")
+        on.exit(try(DBI::dbDisconnect(con, shutdown = TRUE), silent = TRUE), add = TRUE)
+
+        tmp_name <- paste0("ph_tmp_long_", format(Sys.time(), "%Y%m%d_%H%M%S"))
+        DBI::dbWriteTable(con, tmp_name, tibble::as_tibble(df_long), temporary = TRUE)
+        df_long <- dplyr::tbl(con, tmp_name)
+      }
+
+      view_const <- if (inherits(x, "phip_data")) attr(x, "view") %||% (x$meta$view %||% NA_character_) else NA_character_
 
       # ---- ranks & library ---------------------------------------------------
       ranks_needing_lib <- setdiff(rank_cols, "peptide_id")
+
+      # validate lib (only if needed)
       if (length(ranks_needing_lib)) {
         if (is.null(lib_handle)) .ph_abort("peptide library required for non-peptide ranks (not found).")
-        miss_tax <- setdiff(ranks_needing_lib, colnames(lib_handle))
+
+        # get column names safely for both df and tbl_sql
+        lib_cols <- if (inherits(lib_handle, "tbl_sql")) {
+          colnames(dplyr::collect(dplyr::slice_head(lib_handle, n = 0)))
+        } else {
+          colnames(lib_handle)
+        }
+
+        miss_tax <- setdiff(c("peptide_id", ranks_needing_lib), lib_cols)
         if (length(miss_tax)) .ph_abort("requested taxonomy columns not in peptide_library.", bullets = paste("-", miss_tax))
+      }
+
+      # ensure library is a tbl on the same connection if we need it
+      lib_tbl_for_join <- NULL
+      if (length(ranks_needing_lib)) {
+        if (inherits(lib_handle, "tbl_sql")) {
+          lib_tbl_for_join <- lib_handle
+        } else {
+          lib_tbl_for_join <- tibble::as_tibble(lib_handle)
+          lib_name <- paste0("ph_tmp_lib_", format(Sys.time(), "%Y%m%d_%H%M%S"))
+          DBI::dbWriteTable(con, lib_name, lib_tbl_for_join, temporary = TRUE)
+          lib_tbl_for_join <- dplyr::tbl(con, lib_name)
+        }
       }
 
       df_ranked <- df_long
       if (length(ranks_needing_lib)) {
         lib_cols <- c("peptide_id", ranks_needing_lib)
-        lib_min <- lib_handle |>
-          dplyr::select(tidyselect::all_of(lib_cols)) |>
-          dplyr::distinct()
+        lib_min <- lib_tbl_for_join |> dplyr::select(tidyselect::all_of(lib_cols)) |> dplyr::distinct()
         df_ranked <- df_ranked |> dplyr::left_join(lib_min, by = "peptide_id", copy = TRUE)
       }
+
       available_ranks <- intersect(rank_cols, colnames(df_ranked))
       if (!length(available_ranks)) .ph_abort("none of the requested rank_cols are available.")
       .ph_log_info("ranks resolved", bullets = paste("- available:", paste(available_ranks, collapse = ", ")))
@@ -696,25 +731,16 @@ ph_prevalence_compare <- function(x,
         sum_pairs <- sum(lev_tbl$n_pairs, na.rm = TRUE)
         m_by_rank <- stats::setNames(pool_tbl$POOL * sum_pairs, pool_tbl$rank)
         .ph_log_info("fdr accounting",
-          bullets = c(
-            paste0(
-              "pool per rank: ",
-              paste(paste0(pool_tbl$rank, "=", pool_tbl$POOL), collapse = "; ")
-            ),
-            paste0(
-              "universes: ",
-              paste(paste0(
-                lev_tbl$group_col, " (k=", lev_tbl$k_levels,
-                ", pairs=", lev_tbl$n_pairs, ")"
-              ), collapse = "; ")
-            ),
-            paste0("pairs across universes (sum): ", sum_pairs),
-            paste0(
-              "total tests m per rank = pool * pairs: ",
-              paste(paste0(names(m_by_rank), "=", m_by_rank), collapse = "; ")
-            )
-          )
-        )
+                     bullets = c(
+                       paste0("pool per rank: ",
+                              paste(paste0(pool_tbl$rank, "=", pool_tbl$POOL), collapse = "; ")),
+                       paste0("universes: ",
+                              paste(paste0(lev_tbl$group_col, " (k=", lev_tbl$k_levels,
+                                           ", pairs=", round(lev_tbl$n_pairs, 2), ")"), collapse = "; ")),
+                       paste0("pairs across universes (sum): ", sum_pairs),
+                       paste0("total tests m per rank = pool * pairs: ",
+                              paste(paste0(names(m_by_rank), "=", m_by_rank), collapse = "; "))
+                     ))
 
         # ---- base grid & stats -----------------------------------------------
         base_grid <- group_sizes |>
@@ -902,22 +928,17 @@ ph_prevalence_compare <- function(x,
         if (weight_mode == "peptide_count" && length(ranks_needing_lib)) {
           if (is.null(lib_handle)) .ph_abort("peptide library required for peptide_count weights (not found).")
           lib_cols_needed <- c("peptide_id", ranks_needing_lib)
-          lib_src <- lib_handle %>%
-            dplyr::select(tidyselect::all_of(lib_cols_needed)) %>%
-            dplyr::distinct()
+          lib_src <- if (inherits(lib_handle, "tbl_sql")) lib_handle else tibble::as_tibble(lib_handle)
           tmp_lib <- .q(con, paste0(register_name, "_libtmp"))
           DBI::dbExecute(con, paste0("drop table if exists ", tmp_lib))
           if (inherits(lib_src, "tbl_sql")) {
-            lib_df <- lib_src %>% dplyr::collect()
-            DBI::dbWriteTable(con,
-              name = gsub('^\"|\"$', "", tmp_lib),
-              value = tibble::as_tibble(lib_df), temporary = TRUE
-            )
+            lib_df <- lib_src %>% dplyr::select(tidyselect::all_of(lib_cols_needed)) %>% dplyr::distinct() %>% dplyr::collect()
+            DBI::dbWriteTable(con, name = gsub('^\"|\"$', '', tmp_lib),
+                              value = tibble::as_tibble(lib_df), temporary = TRUE)
           } else {
-            DBI::dbWriteTable(con,
-              name = gsub('^\"|\"$', "", tmp_lib),
-              value = tibble::as_tibble(lib_src), temporary = TRUE
-            )
+            DBI::dbWriteTable(con, name = gsub('^\"|\"$', '', tmp_lib),
+                              value = tibble::as_tibble(lib_src[, lib_cols_needed, drop = FALSE] |> dplyr::distinct()),
+                              temporary = TRUE)
           }
           bad <- ranks_needing_lib[!grepl("^[A-Za-z][A-Za-z0-9_]*$", ranks_needing_lib)]
           if (length(bad)) {
@@ -943,7 +964,6 @@ ph_prevalence_compare <- function(x,
             "group by rank, feature"
           ))
 
-          # >>> FIX: insert dla rank='peptide_id' z ph_prev_* (kolumna 'feature') <<<
           if ("peptide_id" %in% available_ranks) {
             DBI::dbExecute(con, paste0(
               "insert into ", wq, " (rank, feature, n_peptides)
@@ -1014,8 +1034,7 @@ ph_prevalence_compare <- function(x,
               dd$passed_rank_wbh <- !is.na(dd$p_adj_rank_wbh) & dd$p_adj_rank_wbh < 0.05
               dd$category_rank_wbh <- dplyr::case_when(
                 !is.na(dd$p_adj_rank_wbh) & dd$p_adj_rank_wbh < 0.05 ~ "significant (wBH, per rank)",
-                # !is.na(dd$p_adj_rank)     & dd$p_adj_rank     < 0.05 ~ "significant (BH, per rank)",
-                !is.na(dd$p_raw) & dd$p_raw < 0.05 ~ "nominal only",
+                !is.na(dd$p_raw)          & dd$p_raw          < 0.05 ~ "nominal only",
                 TRUE ~ "not significant"
               )
               dd
@@ -1051,14 +1070,12 @@ ph_prevalence_compare <- function(x,
             view = view_const
           )
 
-          lib_handle2 <- tryCatch(x$peptide_library, error = function(...) NULL)
-          if (!is.null(lib_handle2)) {
-            meta$peptide_library <- lib_handle2
-            meta$peptide_library_cols <- tryCatch(colnames(lib_handle2), error = function(...) NULL)
-          } else {
-            meta$peptide_library <- NULL
-            meta$peptide_library_cols <- NULL
-          }
+          # store whatever was provided as library (optional)
+          meta$peptide_library      <- lib_handle
+          meta$peptide_library_cols <- tryCatch({
+            if (inherits(lib_handle, "tbl_sql")) colnames(dplyr::collect(dplyr::slice_head(lib_handle, n = 0)))
+            else colnames(lib_handle)
+          }, error = function(...) NULL)
 
           out <- .as_prev_result(out_df, meta)
           return(out)
@@ -1078,14 +1095,11 @@ ph_prevalence_compare <- function(x,
             register_name = register_name,
             view = view_const
           )
-          lib_handle2 <- tryCatch(x$peptide_library, error = function(...) NULL)
-          if (!is.null(lib_handle2)) {
-            meta$peptide_library <- lib_handle2
-            meta$peptide_library_cols <- tryCatch(colnames(lib_handle2), error = function(...) NULL)
-          } else {
-            meta$peptide_library <- NULL
-            meta$peptide_library_cols <- NULL
-          }
+          meta$peptide_library      <- lib_handle
+          meta$peptide_library_cols <- tryCatch({
+            if (inherits(lib_handle, "tbl_sql")) colnames(dplyr::collect(dplyr::slice_head(lib_handle, n = 0)))
+            else colnames(lib_handle)
+          }, error = function(...) NULL)
           lazy_tbl <- dplyr::tbl(con, register_name)
           out <- .as_prev_result(lazy_tbl, meta)
           return(out)
@@ -1095,14 +1109,12 @@ ph_prevalence_compare <- function(x,
       # ============================= paired path ==============================
       .ph_log_info("paired design detected: running mcnemar exact (binomial)")
 
-      # skróty do raportu
       present_counts <- k_tbl %>%
         dplyr::filter(present) %>%
         dplyr::distinct(group_col, group_value, rank, feature, sample_id) %>%
         dplyr::count(group_col, group_value, rank, feature, name = "n_present")
       features_per_rank <- present_counts |> dplyr::distinct(rank, feature)
 
-      # accounting
       pool_tbl <- features_per_rank |>
         dplyr::count(rank, name = "POOL") |>
         dplyr::arrange(rank) |>
@@ -1130,7 +1142,6 @@ ph_prevalence_compare <- function(x,
         )
       )
 
-      # bazowe stats (do wglądu)
       base_grid <- group_sizes |>
         dplyr::select(group_col, group_value) |>
         dplyr::distinct() |>
@@ -1153,14 +1164,12 @@ ph_prevalence_compare <- function(x,
       by_cols <- intersect(c("view", "rank", "feature", "group_col"), colnames(stats_long))
       has_view <- "view" %in% colnames(stats_long)
 
-      # 1) pary (porządek deterministyczny "<")
       pairs_joined <- stats_long %>%
-        dplyr::inner_join(stats_long, by = by_cols, suffix = c("_1", "_2")) %>%
+        dplyr::inner_join(stats_long, by = by_cols, suffix = c("_1","_2")) %>%
         dplyr::filter(group_value_1 != group_value_2) %>%
         dplyr::mutate(
           group1 = dplyr::if_else(group_value_1 < group_value_2, group_value_1, group_value_2),
           group2 = dplyr::if_else(group_value_1 < group_value_2, group_value_2, group_value_1),
-          # fallback niesparowany (nadpiszemy później wartościami paired)
           n1 = dplyr::if_else(group_value_1 < group_value_2, n_present_1, n_present_2),
           n2 = dplyr::if_else(group_value_1 < group_value_2, n_present_2, n_present_1),
           prop1 = dplyr::if_else(group_value_1 < group_value_2, prop_1, prop_2),
@@ -1169,13 +1178,10 @@ ph_prevalence_compare <- function(x,
           percent2 = dplyr::if_else(group_value_1 < group_value_2, percent_2, percent_1)
         ) %>%
         dplyr::filter(group_value_1 == group1) %>%
-        dplyr::select(
-          tidyselect::any_of("view"), rank, feature, group_col, group1, group2,
-          n1, n2, prop1, percent1, prop2, percent2
-        ) %>%
+        { if (has_view) dplyr::transmute(., view, rank, feature, group_col, group1, group2, n1, n2, prop1, percent1, prop2, percent2)
+          else dplyr::transmute(., rank, feature, group_col, group1, group2, n1, n2, prop1, percent1, prop2, percent2) } %>%
         dplyr::distinct()
 
-      # 2) dane sparowane do McNemara
       sdat <- k_tbl %>%
         dplyr::select(group_col, group_value, rank, feature, dplyr::all_of(found_paired_col), present) %>%
         dplyr::collect() %>%
@@ -1223,9 +1229,7 @@ ph_prevalence_compare <- function(x,
         dplyr::left_join(disc, by = c("group_col", "rank", "feature", "group1", "group2")) %>%
         dplyr::left_join(paired_summary, by = c("group_col", "rank", "feature", "group1", "group2")) %>%
         dplyr::mutate(
-          # raport: liczba kompletnych par jako mianownik po obu stronach
           N1 = N_paired, N2 = N_paired,
-          # zliczenia i proporcje oparte o pary (fallback do niesparowanych, gdyby brakowało)
           n1 = dplyr::coalesce(n1_paired, n1),
           n2 = dplyr::coalesce(n2_paired, n2),
           prop1 = dplyr::coalesce(prop1_paired, prop1),
@@ -1234,7 +1238,6 @@ ph_prevalence_compare <- function(x,
           percent2 = 100 * prop2
         )
 
-      # ---- wagi do wBH (paired) ---------------------------------------------
       w_tbl <- if (weight_mode == "peptide_count" && length(ranks_needing_lib)) {
         if (is.null(lib_handle)) .ph_abort("peptide library required for peptide_count weights (not found).")
 
@@ -1263,7 +1266,6 @@ ph_prevalence_compare <- function(x,
         })
 
         if ("peptide_id" %in% available_ranks) {
-          # prostsze i pewne: cechy z wyników (rank == peptide_id)
           pid_vals <- unique(res$feature[res$rank == "peptide_id"])
           base_tbl <- dplyr::bind_rows(
             base_tbl,
@@ -1277,7 +1279,6 @@ ph_prevalence_compare <- function(x,
           dplyr::mutate(n_peptides = 1L)
       }
 
-      # ---- BH / wBH (paired) -------------------------------------------------
       do_bh <- function(df) {
         df %>%
           dplyr::mutate(
@@ -1325,7 +1326,7 @@ ph_prevalence_compare <- function(x,
           dd$passed_rank_wbh <- !is.na(dd$p_adj_rank_wbh) & dd$p_adj_rank_wbh < 0.05
           dd$category_rank_wbh <- dplyr::case_when(
             !is.na(dd$p_adj_rank_wbh) & dd$p_adj_rank_wbh < 0.05 ~ "significant (wBH, per rank)",
-            !is.na(dd$p_raw) & dd$p_raw < 0.05 ~ "nominal only",
+            !is.na(dd$p_raw & dd$p_raw < 0.05) ~ "nominal only",
             TRUE ~ "not significant"
           )
           dd
@@ -1370,14 +1371,18 @@ ph_prevalence_compare <- function(x,
         register_name = register_name,
         view = view_const
       )
-      meta$peptide_library <- lib_handle
-      meta$peptide_library_cols <- tryCatch(colnames(lib_handle), error = function(...) NULL)
+      meta$peptide_library      <- lib_handle
+      meta$peptide_library_cols <- tryCatch({
+        if (inherits(lib_handle, "tbl_sql")) colnames(dplyr::collect(dplyr::slice_head(lib_handle, n = 0)))
+        else colnames(lib_handle)
+      }, error = function(...) NULL)
 
       out <- .as_prev_result(out_df, meta)
       return(out)
     }
   )
 }
+
 
 # phiper-style writers for results (generic + ph_prev_result)
 # - Generic dispatcher: write_result()
