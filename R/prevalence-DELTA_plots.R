@@ -33,118 +33,112 @@
 #' # p
 #'
 #' @export
+# ==============================================================================
+# Δ prevalence vs pooled prevalence (per peptide)
+# Input: tibble from ph_compute_prevalence() with (group1, group2, prop1, prop2)
+# Optional id column: "feature" (used only for row identity; not required)
+# ==============================================================================
 deltaplot_prevalence <- function(
-  prev_tbl,
-  group_col = "Group",
-  value_col = "Prevalence",
-  peptide_col = "peptide_id",
-  group_order = NULL,
-  jitter_width = 0.005,
-  jitter_height = 0.005,
-  point_alpha = 0.25,
-  point_size = 0.6,
-  smooth = TRUE,
-  smooth_k = 5,
-  arrow_color = "red",
-  arrow_length_mm = 4,
-  arrow_pos_x = 0.97,
-  title = NULL,
-  subtitle = NULL,
-  xlab = NULL,
-  ylab = NULL
+    d,
+    group_pair = NULL,           # optional c(g1, g2) to select a specific pair if multiple exist
+    labels     = NULL,           # optional c(label_g1, label_g2) for display (defaults to group1/group2)
+    # Styling
+    jitter_width   = 0.005,
+    jitter_height  = 0.005,
+    point_alpha    = 0.25,
+    point_size     = 0.6,
+    smooth         = TRUE,
+    smooth_k       = 5,
+    arrow_color    = "red",
+    arrow_length_mm= 4,
+    arrow_pos_x    = 0.97,
+    title          = NULL,
+    subtitle       = NULL,
+    xlab           = NULL,
+    ylab           = NULL
 ) {
-  # --- basic checks -----------------------------------------------------------
-  need <- c(peptide_col, group_col, value_col)
-  miss <- setdiff(need, names(prev_tbl))
+  # ---- Basic checks -----------------------------------------------------------
+  need <- c("group1","group2","prop1","prop2")
+  miss <- setdiff(need, names(d))
   if (length(miss)) {
-    stop(
-      "deltaplot_prevalence: missing required columns: ",
-      paste(miss, collapse = ", ")
-    )
+    stop("deltaplot_prevalence(): missing columns from ph_compute_prevalence(): ",
+         paste(miss, collapse = ", "))
   }
 
-  # --- wide table with exactly two groups ------------------------------------
-  wide <- prev_tbl |>
-    dplyr::select(dplyr::all_of(c(peptide_col, group_col, value_col))) |>
-    tidyr::pivot_wider(
-      names_from = !!rlang::sym(group_col),
-      values_from = !!rlang::sym(value_col)
-    )
-
-  grp_names <- setdiff(names(wide), peptide_col)
-
-  if (length(grp_names) != 2L && is.null(group_order)) {
-    stop(
-      "deltaplot_prevalence: expected exactly two groups in `", group_col,
-      "`, found: ", paste(grp_names, collapse = ", ")
-    )
-  }
-
-  if (!is.null(group_order)) {
-    if (length(group_order) != 2) stop("group_order must have length 2.")
-    if (!all(group_order %in% grp_names)) {
-      stop(
-        "group_order values must be present in ", group_col,
-        ". Found groups: ", paste(grp_names, collapse = ", ")
-      )
-    }
-    g1 <- group_order[1]
-    g2 <- group_order[2]
+  # ---- Select exactly one (group1, group2) pair ------------------------------
+  pairs <- unique(d[, c("group1","group2")])
+  if (!is.null(group_pair)) {
+    if (length(group_pair) != 2L) stop("group_pair must be length-2 vector: c(g1, g2).")
+    d <- d[d$group1 == group_pair[1] & d$group2 == group_pair[2], , drop = FALSE]
+    if (!nrow(d)) stop("No rows left after filtering to group_pair = c('",
+                       group_pair[1], "', '", group_pair[2], "').")
+    g1_raw <- group_pair[1]
+    g2_raw <- group_pair[2]
   } else {
-    # stable (alphabetical) order
-    g1 <- sort(grp_names)[1]
-    g2 <- sort(grp_names)[2]
+    if (nrow(pairs) != 1L) {
+      stop("Multiple (group1, group2) pairs detected. ",
+           "Filter your tibble to one pair or pass group_pair = c(g1, g2). ",
+           "Found pairs: ",
+           paste0(utils::capture.output(print(pairs)), collapse = " "))
+    }
+    g1_raw <- pairs$group1[1]
+    g2_raw <- pairs$group2[1]
   }
 
-  # --- pooled & delta ---------------------------------------------------------
-  w <- wide |>
+  # ---- Labels for display -----------------------------------------------------
+  if (is.null(labels)) {
+    g1_lab <- as.character(g1_raw)
+    g2_lab <- as.character(g2_raw)
+  } else {
+    if (length(labels) != 2L) stop("labels must be length-2 vector: c(label_g1, label_g2).")
+    g1_lab <- labels[1]
+    g2_lab <- labels[2]
+  }
+
+  # ---- Compute pooled and delta ----------------------------------------------
+  w <- d %>%
+    dplyr::transmute(
+      id     = if ("feature" %in% names(.)) .data$feature else dplyr::row_number(),
+      pooled = (prop1 + prop2) / 2,
+      delta  =  prop2 - prop1
+    ) %>%
+    dplyr::filter(is.finite(pooled), is.finite(delta)) %>%
     dplyr::mutate(
-      pooled = (.data[[g1]] + .data[[g2]]) / 2,
-      delta = .data[[g2]] - .data[[g1]]
+      pooled_clip = pmin(pmax(as.numeric(pooled), 1e-6), 1 - 1e-6)
     )
 
-  w_clean <- w |>
-    dplyr::filter(is.finite(pooled), is.finite(delta)) |>
-    dplyr::mutate(pooled_clip = pmin(pmax(as.numeric(pooled), 1e-6), 1 - 1e-6))
+  if (!nrow(w)) stop("No finite rows to plot after pooled/delta computation.")
 
-  if (!nrow(w_clean)) {
-    stop("deltaplot_prevalence: no finite rows to plot after computing pooled & delta.")
-  }
+  # Arrow near right edge of observed range
+  arrow_x <- max(w$pooled_clip, na.rm = TRUE) * arrow_pos_x
 
-  # Arrow position near the right edge of the data
-  arrow_x <- max(w_clean$pooled_clip, na.rm = TRUE) * arrow_pos_x
-
-  # --- build plot -------------------------------------------------------------
-  p <- ggplot2::ggplot(w_clean, ggplot2::aes(pooled_clip, delta)) +
+  # ---- Plot -------------------------------------------------------------------
+  p <- ggplot2::ggplot(w, ggplot2::aes(pooled_clip, delta)) +
     ggplot2::geom_hline(yintercept = 0, linetype = 2) +
-    ggplot2::geom_jitter(
-      alpha = point_alpha,
-      height = jitter_height,
-      width = jitter_width,
-      size = point_size
-    )
+    ggplot2::geom_jitter(alpha = point_alpha,
+                         height = jitter_height,
+                         width  = jitter_width,
+                         size   = point_size)
 
   if (isTRUE(smooth)) {
-    # mgcv::gam; ok to depend on mgcv indirectly via ggplot2
     p <- p + ggplot2::geom_smooth(
-      method = "gam",
+      method  = "gam",
       formula = y ~ s(x, k = smooth_k),
-      se = FALSE
+      se      = FALSE
     )
   }
 
-  # directional arrows & labels
   p <- p +
     ggplot2::annotate(
       "segment",
-      x = arrow_x, xend = arrow_x, y = 0, yend = 0.06,
+      x = arrow_x, xend = arrow_x, y = 0, yend =  0.06,
       colour = arrow_color, linewidth = 0.6,
       arrow = grid::arrow(length = grid::unit(arrow_length_mm, "mm"))
     ) +
     ggplot2::annotate(
       "text",
       x = arrow_x, y = 0.065,
-      label = paste0("More in ", g2),
+      label = paste0("More in ", g2_lab),
       colour = arrow_color, fontface = "bold", vjust = 0
     ) +
     ggplot2::annotate(
@@ -156,16 +150,16 @@ deltaplot_prevalence <- function(
     ggplot2::annotate(
       "text",
       x = arrow_x, y = -0.065,
-      label = paste0("More in ", g1),
+      label = paste0("More in ", g1_lab),
       colour = arrow_color, fontface = "bold", vjust = 1
     ) +
     ggplot2::scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
     ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 0.1)) +
     ggplot2::labs(
-      title = title %||% paste0("Per-peptide shift vs pooled prevalence (", g2, " - ", g1, ")"),
+      title    = title %||% paste0("Per-peptide shift vs pooled prevalence (", g2_lab, " - ", g1_lab, ")"),
       subtitle = subtitle,
-      x = xlab %||% paste0("Pooled prevalence (", g1, " & ", g2, ")"),
-      y = ylab %||% paste0("\u0394 prevalence (", g2, " - ", g1, ")")
+      x        = xlab %||% paste0("Pooled prevalence (", g1_lab, " & ", g2_lab, ")"),
+      y        = ylab %||% paste0("\u0394 prevalence (", g2_lab, " - ", g1_lab, ")")
     ) +
     ggplot2::coord_cartesian(clip = "off") +
     ggplot2::theme_classic() +
@@ -177,149 +171,196 @@ deltaplot_prevalence <- function(
   p
 }
 
-#' Build per-peptide prevalence for a chosen rank/feature and two groups (standalone)
-#'
-#' @description
-#' Construct a long per-peptide prevalence table for a specific `rank` value
-#' (e.g., a species or a boolean annotation) comparing two groups in
-#' `x$data_long`. Works directly with `phip_data` that carries a
-#' `peptide_library`, without calling any other helper.
-#'
-#' @param x A `phip_data` object with `data_long` and `peptide_library`.
-#' @param rank Peptide-library column to filter on (e.g. `"species"` or `"is_flagellum"`).
-#' @param feature_value Value(s) to keep in `rank` (e.g. `"Acadevirus PM93"`,
-#'   `TRUE`, or a character vector). Character/logical matching is case-insensitive.
-#' @param group_col Column in `x$data_long` defining groups (default `"timepoint_factor"`).
-#' @param groups Character(2) with the two groups to compare, e.g. `c("T2","T8")`.
-#' @param labels Character(2) display labels for those groups (default `c("B","M12")`).
-#' @param filter Optional named list of simple equality filters applied to `x$data_long`
-#'   before computing prevalences, e.g. `list(big_group = "kid_serum")` or
-#'   `list(site = c("gut","oral"))`. (Uses `%in%`.)
-#' @param eps Laplace numerator epsilon (default `0.5`).
-#' @param den_mult Denominator epsilon multiplier (default `2`).
-#'
-#' @return A tibble with columns: `peptide_id`, `Group` (display label),
-#'   and `Prevalence` (smoothed, in 0–1).
-#'
-#' @examples
-#' # Species example (case-insensitive match), kid_serum, T2 vs T8 labeled B/M12:
-#' prev_tbl <- ph_make_prev_tbl_standalone(
-#'   x = ps_merged_box_bin,
-#'   rank = "species",
-#'   feature_value = "Acadevirus PM93",
-#'   group_col = "timepoint_factor",
-#'   groups = c("T2", "T8"),
-#'   labels = c("B", "M12"),
-#'   filter = list(big_group = "kid_serum")
-#' )
-#' # Now plot with your delta plotter:
-#' # deltaplot_prevalence(prev_tbl, group_order = c("B","M12"))
-#'
+# ==============================================================================
+# Interactive Δ prevalence vs pooled prevalence (per peptide)
+# Input: tibble from ph_compute_prevalence() with:
+#   group1, group2, prop1, prop2, (n1, N1, percent1), (n2, N2, percent2),
+#   optional: feature, p_adj_rank_wbh
+# ==============================================================================
 #' @export
-ph_make_prev_tbl_standalone <- function(
-  x,
-  rank = "is_flagellum",
-  feature_value = TRUE,
-  group_col = "timepoint_factor",
-  groups = c("T2", "T8"),
-  labels = c("B", "M12"),
-  filter = list(),
-  eps = 0.5,
-  den_mult = 2
-) {
-  stopifnot(length(groups) == 2L, length(labels) == 2L)
-  if (!inherits(x, "phip_data")) {
-    stop("`x` must be a phip_data with $data_long and $peptide_library.")
-  }
+deltaplot_prevalence_interactive <- function(
+    d,
+    group_pair = NULL,
+    labels     = NULL,
+    # Styling
+    point_alpha     = 0.6,
+    point_size      = 6,
+    smooth          = TRUE,
+    smooth_k        = 5,
+    arrow_color     = "red",
+    # stała geometria strzałek/etykiet
+    arrow_x_pct     = 0.97,  # 0..1 po osi X
+    arrow_frac_h    = 0.30,  # 0..1 wysokości osi Y
+    label_dx        = 0.03,  # ile osi X w lewo od strzałki
+    label_dy        = 0.02,  # pionowy margines etykiet
+    title           = NULL,
+    subtitle        = NULL,
+    # Jitter (display-only)
+    jitter          = TRUE,
+    jitter_width    = 0.005,
+    jitter_height   = 0.005,
+    jitter_seed     = NULL
+){
+  need <- c("group1","group2","prop1","prop2")
+  miss <- setdiff(need, names(d))
+  if (length(miss)) stop("deltaplot_prevalence_interactive(): missing: ", paste(miss, collapse=", "))
 
-  dl <- x$data_long
-  need_cols <- c("sample_id", "peptide_id", group_col, "exist")
-  miss <- setdiff(need_cols, colnames(dl))
-  if (length(miss)) stop("x$data_long is missing: ", paste(miss, collapse = ", "))
-
-  # 1) apply equality filters safely (SQL-friendly)
-  if (length(filter)) {
-    for (nm in names(filter)) {
-      if (!nm %in% colnames(dl)) {
-        stop("Filter column '", nm, "' not in x$data_long.")
-      }
-      vals <- filter[[nm]]
-      dl <- dplyr::filter(dl, .data[[nm]] %in% !!vals)
-    }
-  }
-
-  # target groups only
-  dl <- dplyr::filter(dl, .data[[group_col]] %in% !!groups)
-
-  # 2) ensure peptide_library is on same connection, join rank
-  lib_src <- x$peptide_library %>%
-    dplyr::select(peptide_id, !!rlang::sym(rank)) %>%
-    dplyr::distinct()
-
-  con_dl <- tryCatch(dbplyr::remote_con(dl), error = function(...) NULL)
-  con_lib <- tryCatch(dbplyr::remote_con(lib_src), error = function(...) NULL)
-  same_con <- !is.null(con_dl) && !is.null(con_lib) && identical(con_dl, con_lib)
-
-  if (!same_con && !is.null(con_dl)) {
-    lib_df <- dplyr::collect(lib_src)
-    tmp <- paste0("ph_tmp_lib_", as.integer(runif(1) * 1e9))
-    DBI::dbWriteTable(con_dl, tmp, tibble::as_tibble(lib_df), temporary = TRUE, overwrite = TRUE)
-    lib_tbl <- dplyr::tbl(con_dl, tmp)
+  # wybór pary
+  if (!is.null(group_pair)) {
+    stopifnot(length(group_pair) == 2L)
+    d <- d[d$group1 == group_pair[1] & d$group2 == group_pair[2], , drop = FALSE]
+    if (!nrow(d)) stop("No rows after filtering to group_pair.")
+    g1_raw <- group_pair[1]; g2_raw <- group_pair[2]
   } else {
-    lib_tbl <- lib_src
+    pairs <- unique(d[, c("group1","group2")])
+    if (nrow(pairs) != 1L) stop("Multiple (group1,group2) pairs – pass group_pair.")
+    g1_raw <- pairs$group1[1]; g2_raw <- pairs$group2[1]
   }
+  if (is.null(labels)) { g1_lab <- as.character(g1_raw); g2_lab <- as.character(g2_raw)
+  } else { stopifnot(length(labels) == 2L); g1_lab <- labels[1]; g2_lab <- labels[2] }
 
-  dl <- dl %>%
-    dplyr::left_join(lib_tbl, by = "peptide_id") %>%
-    dplyr::mutate(
-      rank_chr = dplyr::if_else(is.na(.data[[rank]]), NA_character_, as.character(.data[[rank]])),
-      rank_ci  = tolower(rank_chr)
-    )
+  # kolumny pomocnicze
+  if (!("feature" %in% names(d))) {
+    d$feature <- if ("peptide_id" %in% names(d)) as.character(d$peptide_id) else as.character(seq_len(nrow(d)))
+  }
+  if (!("percent1" %in% names(d))) d$percent1 <- d$prop1 * 100
+  if (!("percent2" %in% names(d))) d$percent2 <- d$prop2 * 100
+  pick_or <- function(df, nm, default = NA_real_) if (nm %in% names(df)) df[[nm]] else default
 
-  # 3) filter by feature_value (case-insensitive) on SQL
-  fv_ci <- tolower(as.character(feature_value))
-  dl <- dplyr::filter(dl, .data$rank_ci %in% !!fv_ci)
-
-  # 4) subject fallback id (still SQL)
-  dl <- dl %>%
-    dplyr::mutate(
-      subj_chr   = dplyr::if_else(!is.na(.data$subject_id), as.character(.data$subject_id), NA_character_),
-      sample_chr = paste0("S", as.character(.data$sample_id)),
-      id         = dplyr::coalesce(subj_chr, sample_chr)
-    )
-
-  # 5) compute x, n, prevalence on SQL ONLY — no labeling yet
-  prev_sql <- dl %>%
-    dplyr::group_by(peptide_id, !!rlang::sym(group_col)) %>%
-    dplyr::summarise(
-      x = sum(exist > 0L),
-      n = dplyr::n_distinct(id),
-      .groups = "drop"
-    ) %>%
-    dplyr::mutate(Prevalence = (x + eps) / (n + den_mult * eps)) %>%
-    dplyr::rename(Group_raw = !!rlang::sym(group_col)) %>%
-    dplyr::select(peptide_id, Group_raw, Prevalence)
-
-  # 6) now materialize, then map to labels in R (avoids dbplyr CASE/CAST issues)
-  prev <- dplyr::collect(prev_sql)
-
-  prev <- prev %>%
-    dplyr::mutate(
-      Group = dplyr::case_when(
-        Group_raw == groups[1] ~ labels[1],
-        Group_raw == groups[2] ~ labels[2],
-        TRUE ~ as.character(Group_raw)
+  w <- d %>%
+    dplyr::transmute(
+      feature   = .data$feature,
+      pooled    = (prop1 + prop2) / 2,
+      delta     =  prop2 - prop1,
+      n1 = pick_or(d,"n1"), N1 = pick_or(d,"N1"), pct1 = percent1,
+      n2 = pick_or(d,"n2"), N2 = pick_or(d,"N2"), pct2 = percent2,
+      p_adj_wbh = dplyr::coalesce(
+        pick_or(d,"p_adj_rank_wbh"),
+        pick_or(d,"padj_wbh"),
+        pick_or(d,"p_adj"),
+        pick_or(d,"p_raw")
       )
     ) %>%
-    dplyr::select(peptide_id, Group, Prevalence)
+    dplyr::filter(is.finite(pooled), is.finite(delta)) %>%
+    dplyr::mutate(pooled_clip = pmin(pmax(as.numeric(pooled), 1e-6), 1 - 1e-6))
+  if (!nrow(w)) stop("No finite rows to plot.")
 
-  # sanity: warn if unexpected groups made it through
-  bad <- setdiff(unique(prev$Group), labels)
-  if (length(bad)) {
-    warning("Unexpected groups in output: ", paste(bad, collapse = ", "), call. = FALSE)
+  # jitter (display)
+  if (isTRUE(jitter)) {
+    if (!is.null(jitter_seed)) { old_seed <- .Random.seed; set.seed(jitter_seed); on.exit({ if (exists("old_seed")) .Random.seed <<- old_seed }, add=TRUE) }
+    jx <- stats::runif(nrow(w), -jitter_width,  jitter_width)
+    jy <- stats::runif(nrow(w), -jitter_height, jitter_height)
+    x_jit <- pmin(pmax(w$pooled_clip + jx, 1e-6), 1 - 1e-6)
+    y_jit <- w$delta + jy
+  } else { x_jit <- w$pooled_clip; y_jit <- w$delta }
+
+  # smooth (opcjonalnie)
+  smooth_df <- NULL
+  if (isTRUE(smooth) && requireNamespace("mgcv", quietly = TRUE)) {
+    fit <- mgcv::gam(delta ~ s(pooled_clip, k = smooth_k), data = w)
+    xs  <- seq(min(w$pooled_clip), max(w$pooled_clip), length.out = 200)
+    smooth_df <- data.frame(pooled_clip = xs,
+                            delta = stats::predict(fit, newdata = data.frame(pooled_clip = xs), type = "response"))
   }
 
-  prev
+  # --- GEOMETRIA STRZAŁEK/ETYKIET ---
+  # osie w "data units"
+  xr <- c(0, 1)                               # pooled_clip zawsze [0,1]
+  yr <- range(w$delta, na.rm = TRUE)
+  if (!is.finite(diff(yr)) || diff(yr) == 0) yr <- c(-0.05, 0.05)  # awaryjnie
+  xspan <- diff(xr);  yspan <- diff(yr)
+
+  arrow_x_pct <- max(0.002, min(0.995, arrow_x_pct))
+  arrow_x   <- xr[1] + xspan * arrow_x_pct
+  arrow_len <- max(1e-6, arrow_frac_h * yspan)
+
+  # etykiety: gwarantowanie nad/pod zerem, z minimalnym buforem eps
+  eps <- max(yspan * 0.005, 1e-6)
+  label_x <- max(xr[1], arrow_x - label_dx * xspan)
+
+  y_up   <- min(yr[2] - label_dy * yspan,  0 + 0.6 * arrow_len)
+  if (y_up <= 0)  y_up <- min(0 + eps, yr[2] - label_dy * yspan)
+
+  y_down <- max(yr[1] + label_dy * yspan,  0 - 0.6 * arrow_len)
+  if (y_down >= 0) y_down <- max(0 - eps, yr[1] + label_dy * yspan)
+
+  # hover
+  fmt_pct <- function(x) sprintf("%.1f%%", x)
+  fmt_p   <- function(p) ifelse(is.na(p), "NA", formatC(p, format="e", digits=2))
+  hover_text <- sprintf(
+    paste0("<b>%s</b><br>",
+           "%s: %s/%s (%s)<br>",
+           "%s: %s/%s (%s)<br>",
+           "p (Fisher, wBH): %s<br>",
+           "pooled: %s<br>",
+           "\u0394: %s"),
+    w$feature,
+    g1_lab, ifelse(is.na(w$n1),"NA",w$n1), ifelse(is.na(w$N1),"NA",w$N1), fmt_pct(w$pct1),
+    g2_lab, ifelse(is.na(w$n2),"NA",w$n2), ifelse(is.na(w$N2),"NA",w$N2), fmt_pct(w$pct2),
+    fmt_p(w$p_adj_wbh),
+    scales::percent(w$pooled_clip, accuracy = 0.1),
+    scales::percent(w$delta,       accuracy = 0.1)
+  )
+
+  plt <- plotly::plot_ly() |>
+    plotly::add_trace(
+      type="scatter", mode="markers",
+      x=x_jit, y=y_jit, text=hover_text, hoverinfo="text",
+      marker=list(size=point_size, opacity=point_alpha)
+    ) |>
+    plotly::add_trace(
+      type="scatter", mode="lines",
+      x = xr, y = c(0,0),
+      hoverinfo="skip", line=list(dash="dash"),
+      showlegend=FALSE
+    )
+
+  if (!is.null(smooth_df)) {
+    plt <- plt |>
+      plotly::add_trace(
+        type="scatter", mode="lines",
+        x=smooth_df$pooled_clip, y=smooth_df$delta,
+        hoverinfo="skip", showlegend=FALSE
+      )
+  }
+
+  plt <- plt |>
+    plotly::layout(
+      title = list(text = htmltools::HTML(
+        paste0(title %||% sprintf("Per-peptide shift vs pooled prevalence ( %s \u2212 %s )", g2_lab, g1_lab),
+               if (!is.null(subtitle)) sprintf("<br><sup>%s</sup>", subtitle) else "")
+      )),
+      xaxis = list(title=sprintf("Pooled prevalence (%s & %s)", g1_lab, g2_lab),
+                   tickformat=".0%%", range=xr),
+      yaxis = list(title=sprintf("\u0394 prevalence (%s \u2212 %s)", g2_lab, g1_lab),
+                   tickformat=".1%"),
+      annotations = list(
+        # strzałka w górę
+        list(x=arrow_x, y= arrow_len, xref="x", yref="y",
+             ax=arrow_x, ay=0, axref="x", ayref="y",
+             text="", showarrow=TRUE, arrowhead=2, arrowsize=0.6,
+             arrowwidth=2, arrowcolor=arrow_color),
+        # strzałka w dół
+        list(x=arrow_x, y=-arrow_len, xref="x", yref="y",
+             ax=arrow_x, ay=0, axref="x", ayref="y",
+             text="", showarrow=TRUE, arrowhead=2, arrowsize=0.6,
+             arrowwidth=2, arrowcolor=arrow_color),
+
+        # etykieta nad zerem
+        list(x=label_x, y=y_up, xref="x", yref="y",
+             text=paste0("More in ", g2_lab), showarrow=FALSE,
+             xanchor="right", font=list(color=arrow_color, size=12),
+             bgcolor="rgba(255,255,255,0.65)", bordercolor=arrow_color, borderwidth=1),
+        # etykieta pod zerem
+        list(x=label_x, y=y_down, xref="x", yref="y",
+             text=paste0("More in ", g1_lab), showarrow=FALSE,
+             xanchor="right", font=list(color=arrow_color, size=12),
+             bgcolor="rgba(255,255,255,0.65)", bordercolor=arrow_color, borderwidth=1)
+      ),
+      margin = list(l=60, r=80, b=60, t=60)
+    )
+
+  plt
 }
 
 # -------------------------------------------------------------------------
@@ -331,8 +372,8 @@ ph_make_prev_tbl_standalone <- function(
 #' @description
 #' Builds a forest plot for the most extreme DELTA/Stouffer results within a
 #' chosen rank using the **raw** `T_obs` (no division by any SD). Rows can be
-#' restricted to BH-significant results (per rank). Colors are purely aesthetic
-#' and do not change geometry.
+#' optionally filtered by a significance column (e.g., `p_adj_rank`, `padj_wbh`)
+#' with a user-specified threshold.
 #'
 #' @param x A data frame/tibble with at least:
 #'   `rank, feature, group1, group2, design, T_obs, p_perm, p_adj_rank, category_rank_bh`.
@@ -340,8 +381,11 @@ ph_make_prev_tbl_standalone <- function(
 #' @param n_each Integer; how many items from negative and positive tails (default 15).
 #' @param color Logical; if `TRUE`, lines/points are shaded blue (left, T<0) to
 #'   red (right, T>0) with higher contrast; otherwise monochrome.
-#' @param bh_only Logical; if `TRUE` (default) keep only rows with
-#'   `category_rank_bh == "significant (BH, per rank)"`.
+#' @param filter_significant character; name of the column to filter on, or `"none"` to disable filtering.
+#'   if the named column is numeric, rows are kept where `col <= sig_level`.
+#'   if the named column is non-numeric (e.g., `category_rank_bh`), rows are kept where
+#'   `col == "significant (BH, per rank)"`. default: `"none"`.
+#' @param sig_level numeric; significance threshold used when `filter_significant` is a numeric column (default 0.05).
 #' @param add_signed_z_from_p Logical; if `TRUE`, computes a signed Z from
 #'   permutation p (`sign(T_obs) * qnorm(1 - p_perm/2)`) and returns it in data.
 #' @param left_label Text for the left arrow/side label.
@@ -366,125 +410,66 @@ ph_make_prev_tbl_standalone <- function(
 #' - `T_obs` here is plotted **as is** (raw Stouffer statistic from your shift).
 #' - For calibrated inference or cross-figure comparability, prefer permutation
 #'   p-values (optionally expose `add_signed_z_from_p=TRUE` for reporting).
-#'
-#' @examples
-#' \dontrun{
-#' out <- forest_delta(res_shift,
-#'   rank_of_interest = "species",
-#'   n_each = 15, color = TRUE
-#' )
-#' out$plot
-#' }
-#'
-#' @importFrom dplyr filter arrange slice_head bind_rows mutate case_when desc any_of
-#' @importFrom ggplot2 ggplot aes geom_vline geom_segment geom_point labs theme
-#' @importFrom ggplot2 annotate scale_color_gradientn coord_cartesian theme_void
-#' @importFrom forcats fct_reorder
-#' @importFrom stats qnorm
 #' @export
 forest_delta <- function(
-  x,
-  rank_of_interest,
-  n_each = 15,
-  color = FALSE,
-  bh_only = TRUE,
-  add_signed_z_from_p = FALSE,
-  # arrow/label params
-  left_label = "More in group1",
-  right_label = "More in group2",
-  arrow_frac = 0.35,
-  text_size = 3.8,
-  text_gap_frac = 0.06,
-  y_pad = 0.6,
-  text_y_offset = 0.00,
-  text_vjust = -0.30,
-  arrow_color = "red",
-  arrow_lwd = 0.6,
-  arrow_head_cm = 0.30
+    x,
+    rank_of_interest,
+    n_each = NULL,
+    n_neg_each = 15,
+    n_pos_each = 15,
+    color = FALSE,
+    filter_significant = "none",
+    sig_level = 0.05,
+    add_signed_z_from_p = FALSE,
+    # arrow/label params
+    left_label    = "More in group1",
+    right_label   = "More in group2",
+    arrow_frac    = 0.35,
+    text_gap_frac = 0.06,
+    y_pad         = 0.6,
+    text_y_offset = 0.00,
+    text_vjust    = -0.30,
+    arrow_color   = "red",
+    arrow_lwd     = 0.6,
+    arrow_head_cm = 0.30,
+    # NEW: global typography & aesthetics
+    base_text_pt  = 12,           # działa na WSZYSTKIE teksty
+    font_family   = "Montserrat", # lub "Arial"/"Calibri"/"System default"
+    seg_width     = 1.2,
+    point_size    = 3.6,
+    show_grid     = FALSE
 ) {
-  # ---- basic checks -----------------------------------------------------------
-  if (!is.data.frame(x)) {
-    if (exists(".ph_abort", mode = "function")) .ph_abort("`x` must be a data.frame/tibble.")
-    stop("`x` must be a data.frame/tibble.")
-  }
-  need_cols <- c("rank", "feature", "group1", "group2", "design", "T_obs", "p_perm", "p_adj_rank", "category_rank_bh")
+  if (!is.data.frame(x)) stop("`x` must be a data.frame/tibble.")
+  need_cols <- c("rank","feature","group1","group2","design","T_obs","p_perm","p_adj_rank","category_rank_bh")
   miss <- setdiff(need_cols, colnames(x))
-  if (length(miss)) {
-    msg <- paste("`x` is missing required columns:", paste(miss, collapse = ", "))
-    if (exists(".ph_abort", mode = "function")) .ph_abort(msg) else stop(msg)
-  }
+  if (length(miss)) stop(paste("`x` is missing required columns:", paste(miss, collapse = ", ")))
+  if (!is.null(n_each)) { n_neg_each <- n_pos_each <- as.integer(n_each) }
 
-  # ---- simple timer + closing log --------------------------------------------
-  t0 <- Sys.time()
-  on.exit(
-    {
-      elapsed <- round(as.numeric(difftime(Sys.time(), t0, units = "secs")), 3)
-      if (exists(".ph_log_ok", mode = "function")) {
-        # no 'step' param → nic nie dotyka nzchar(step)
-        try(
-          .ph_log_ok(
-            headline = "forest_delta finished",
-            bullets = sprintf("elapsed: %s s", elapsed)
-          ),
-          silent = TRUE
-        )
-      } else {
-        message(sprintf("[forest_delta] elapsed: %0.3f s", elapsed))
-      }
-    },
-    add = TRUE
-  )
+  # helper: pt -> ggplot size units
+  .pt_to_gg <- function(pt) pt / 2.845 # ~ ggplot2::.pt
 
-  # ---- optional signed Z from permutation p ----------------------------------
   if (isTRUE(add_signed_z_from_p)) {
-    x$Z_signed_from_p_2s <- sign(x$T_obs) * stats::qnorm(1 - x$p_perm / 2)
-    if (exists(".ph_log_info", mode = "function")) {
-      try(
-        .ph_log_info(
-          headline = "added signed Z from permutation p",
-          bullets = "column: Z_signed_from_p_2s"
-        ),
-        silent = TRUE
-      )
-    }
+    x$Z_signed_from_p_2s <- sign(x$T_obs) * stats::qnorm(1 - x$p_perm/2)
   }
 
-  # ---- filter rank & BH if requested -----------------------------------------
   df_rk <- dplyr::filter(x, .data$rank == rank_of_interest)
-  if (isTRUE(bh_only)) {
-    df_rk <- dplyr::filter(df_rk, .data$category_rank_bh == "significant (BH, per rank)")
-  }
-
-  if (nrow(df_rk) == 0L) {
-    if (exists(".ph_log_info", mode = "function")) {
-      try(
-        .ph_log_info(
-          headline = "no rows left for plotting",
-          bullets = c(
-            paste0("rank: ", rank_of_interest),
-            paste0("bh_only: ", bh_only)
-          )
-        ),
-        silent = TRUE
-      )
+  if (!identical(filter_significant, "none")) {
+    if (!filter_significant %in% colnames(df_rk)) stop(paste0("column '", filter_significant, "' not found"))
+    col_vals <- df_rk[[filter_significant]]
+    if (is.numeric(col_vals)) {
+      df_rk <- dplyr::filter(df_rk, .data[[filter_significant]] <= sig_level)
+    } else {
+      df_rk <- dplyr::filter(df_rk, .data[[filter_significant]] == "significant (BH, per rank)")
     }
-    return(list(
-      data = df_rk,
-      plot = .empty_placeholder_plot(sprintf("No rows to plot (rank='%s')", rank_of_interest))
-    ))
+  }
+  if (nrow(df_rk) == 0L) {
+    return(list(data = df_rk, plot = .empty_placeholder_plot(sprintf("No rows to plot (rank='%s')", rank_of_interest))))
   }
 
-  # ---- select tails on RAW T_obs ---------------------------------------------
   n_pos <- sum(df_rk$T_obs > 0, na.rm = TRUE)
   n_neg <- sum(df_rk$T_obs < 0, na.rm = TRUE)
-
-  top_pos <- df_rk |>
-    dplyr::arrange(dplyr::desc(.data$T_obs)) |>
-    dplyr::slice_head(n = min(n_each, n_pos))
-
-  top_neg <- df_rk |>
-    dplyr::arrange(.data$T_obs) |>
-    dplyr::slice_head(n = min(n_each, n_neg))
+  top_pos <- df_rk |> dplyr::arrange(dplyr::desc(.data$T_obs)) |> dplyr::slice_head(n = min(n_pos_each, n_pos))
+  top_neg <- df_rk |> dplyr::arrange(.data$T_obs)                 |> dplyr::slice_head(n = min(n_neg_each, n_neg))
 
   df_plot <- dplyr::bind_rows(top_neg, top_pos) |>
     dplyr::mutate(
@@ -492,12 +477,187 @@ forest_delta <- function(
       species_label = forcats::fct_reorder(.data$species_label, .data$T_obs)
     )
 
-  # ---- subtitle context -------------------------------------------------------
-  g1 <- if (nrow(df_plot)) df_plot$group1[1] else ""
-  g2 <- if (nrow(df_plot)) df_plot$group2[1] else ""
+  g1  <- if (nrow(df_plot)) df_plot$group1[1] else ""
+  g2  <- if (nrow(df_plot)) df_plot$group2[1] else ""
   des <- if (nrow(df_plot)) df_plot$design[1] else ""
 
-  # ---- color normalization (cosmetic only) -----------------------------------
+  max_neg <- max(abs(df_plot$T_obs[df_plot$T_obs < 0]), na.rm = TRUE)
+  max_pos <- max(df_plot$T_obs[df_plot$T_obs > 0], na.rm = TRUE)
+  if (!is.finite(max_neg) || max_neg == 0) max_neg <- max(abs(df_plot$T_obs), 1, na.rm = TRUE)
+  if (!is.finite(max_pos) || max_pos == 0) max_pos <- max(abs(df_plot$T_obs), 1, na.rm = TRUE)
+  df_plot$T_col <- dplyr::case_when(
+    df_plot$T_obs < 0 ~ -abs(df_plot$T_obs) / max_neg,
+    df_plot$T_obs > 0 ~  df_plot$T_obs / max_pos,
+    TRUE ~ 0
+  )
+  gamma <- 0.85
+  df_plot$T_col <- sign(df_plot$T_col) * (abs(df_plot$T_col))^gamma
+
+  # ---- base ggplot with global typography ----
+  p <- ggplot2::ggplot(df_plot, ggplot2::aes(x = .data$T_obs, y = .data$species_label)) +
+    ggplot2::geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.4, alpha = 0.6) +
+    {
+      if (isTRUE(color)) {
+        ggplot2::geom_segment(
+          ggplot2::aes(x = 0, xend = .data$T_obs, y = .data$species_label, yend = .data$species_label,
+                       color = .data$T_col),
+          linewidth = seg_width, alpha = 0.9, show.legend = FALSE
+        )
+      } else {
+        ggplot2::geom_segment(
+          ggplot2::aes(x = 0, xend = .data$T_obs, y = .data$species_label, yend = .data$species_label),
+          linewidth = seg_width, alpha = 0.85
+        )
+      }
+    } +
+    {
+      if (isTRUE(color)) ggplot2::geom_point(ggplot2::aes(color = .data$T_col), size = point_size, show.legend = FALSE)
+      else               ggplot2::geom_point(size = point_size)
+    } +
+    ggplot2::labs(
+      title = sprintf("Top/Bottom raw Stouffer T - rank: %s", rank_of_interest),
+      subtitle = sprintf("Contrast: %s vs %s (%s); shown: %d neg + %d pos",
+                         g1, g2, des, nrow(top_neg), nrow(top_pos)),
+      x = "Stouffer T (raw)", y = NULL
+    ) +
+    theme_phip() +
+    ggplot2::theme(
+      text = ggplot2::element_text(size = base_text_pt, family = font_family),
+      plot.title    = ggplot2::element_text(size = base_text_pt*1.15, face = "bold"),
+      plot.subtitle = ggplot2::element_text(size = base_text_pt*0.95),
+      axis.title    = ggplot2::element_text(size = base_text_pt),
+      axis.text     = ggplot2::element_text(size = base_text_pt*0.90),
+      legend.text   = ggplot2::element_text(size = base_text_pt*0.90),
+      panel.grid.major = if (isTRUE(show_grid)) ggplot2::element_line() else ggplot2::element_blank(),
+      panel.grid.minor = if (isTRUE(show_grid)) ggplot2::element_line() else ggplot2::element_blank()
+    )
+
+  if (isTRUE(color)) {
+    p <- p + ggplot2::scale_color_gradientn(
+      colors = c("#1f4e79", "#6f94c2", "#eeeeee", "#e7a39c", "#8e1b10"),
+      values = c(0, 0.25, 0.5, 0.75, 1),
+      limits = c(-1, 1)
+    )
+  }
+
+  # ---- red arrows + labels (sizes tied to base_text_pt) ----
+  lvl_n  <- length(levels(df_plot$species_label)); if (lvl_n == 0L) lvl_n <- length(unique(df_plot$species_label))
+  y_top  <- lvl_n + y_pad
+  maxabs <- max(abs(df_plot$T_obs), na.rm = TRUE); if (!is.finite(maxabs) || maxabs == 0) maxabs <- 1
+  x_off  <- arrow_frac * maxabs
+  x_left_text  <- -x_off - text_gap_frac * maxabs
+  x_right_text <-  x_off + text_gap_frac * maxabs
+
+  # dopasuj podtytuł do left/right
+  if (!is.null(p$labels$subtitle)) {
+    s <- p$labels$subtitle
+    s <- sub("^Contrast:\\s*.*?;", paste0("Contrast: ", left_label, " vs ", right_label, ";"), s)
+    p$labels$subtitle <- s
+  }
+
+  arrow_text_size <- .pt_to_gg(base_text_pt * 1.05)
+
+  p <- p +
+    ggplot2::scale_y_discrete(expand = ggplot2::expansion(mult = c(0.05, 0.10))) +
+    ggplot2::coord_cartesian(clip = "off") +
+    ggplot2::annotate("segment", x = 0, xend = -x_off, y = y_top, yend = y_top,
+                      colour = arrow_color, linewidth = arrow_lwd,
+                      arrow = ggplot2::arrow(length = grid::unit(arrow_head_cm, "cm"),
+                                             type = "closed", ends = "last")) +
+    ggplot2::annotate("text", x = x_left_text, y = y_top + text_y_offset, label = left_label,
+                      size = arrow_text_size, colour = arrow_color, fontface = "bold",
+                      family = font_family, hjust = 1, vjust = text_vjust) +
+    ggplot2::annotate("segment", x = 0, xend =  x_off, y = y_top, yend = y_top,
+                      colour = arrow_color, linewidth = arrow_lwd,
+                      arrow = ggplot2::arrow(length = grid::unit(arrow_head_cm, "cm"),
+                                             type = "closed", ends = "last")) +
+    ggplot2::annotate("text", x = x_right_text, y = y_top + text_y_offset, label = right_label,
+                      size = arrow_text_size, colour = arrow_color, fontface = "bold",
+                      family = font_family, hjust = 0, vjust = text_vjust)
+
+  list(data = df_plot, plot = p)
+}
+
+#' @export
+forest_delta_plotly <- function(
+    x,
+    rank_of_interest,
+    n_each = NULL,
+    n_neg_each = 15,
+    n_pos_each = 15,
+    color = FALSE,
+    filter_significant = "none",
+    sig_level = 0.05,
+    add_signed_z_from_p = FALSE,
+    left_label    = "More in group1",
+    right_label   = "More in group2",
+    arrow_frac    = 0.35,
+    text_gap_frac = 0.06,
+    y_pad         = 0.6,
+    text_y_offset = 0.00,
+    text_vjust    = -0.30,
+    arrow_color   = "red",
+    arrow_lwd     = 0.6,
+    arrow_head_cm = 0.30,
+    show_grid     = FALSE,
+    # NEW:
+    base_text_pt  = 12,
+    font_family   = "Montserrat",
+    seg_width     = 1.6,
+    point_size    = 11
+) {
+  if (!is.data.frame(x)) stop("`x` must be a data.frame/tibble.")
+  need_cols <- c("rank","feature","group1","group2","design","T_obs","p_perm","p_adj_rank","category_rank_bh")
+  miss <- setdiff(need_cols, colnames(x))
+  if (length(miss)) stop(paste("`x` is missing required columns:", paste(miss, collapse = ", ")))
+  if (!is.null(n_each)) { n_neg_each <- n_pos_each <- as.integer(n_each) }
+
+  if (isTRUE(add_signed_z_from_p)) {
+    x$Z_signed_from_p_2s <- sign(x$T_obs) * stats::qnorm(1 - x$p_perm/2)
+  }
+
+  df_rk <- dplyr::filter(x, .data$rank == rank_of_interest)
+  if (!identical(filter_significant, "none")) {
+    if (!filter_significant %in% colnames(df_rk)) stop(paste0("column '", filter_significant, "' not found"))
+    if (is.numeric(df_rk[[filter_significant]])) {
+      df_rk <- dplyr::filter(df_rk, .data[[filter_significant]] <= sig_level)
+    } else {
+      df_rk <- dplyr::filter(df_rk, .data[[filter_significant]] == "significant (BH, per rank)")
+    }
+  }
+
+  if (nrow(df_rk) == 0L) {
+    plt <- plotly::plot_ly(type = "scatter", mode = "text") |>
+      plotly::layout(
+        title = list(text = paste0("Top/Bottom raw Stouffer T - rank: ", rank_of_interest)),
+        xaxis = list(visible = FALSE, showgrid = FALSE),
+        yaxis = list(visible = FALSE, showgrid = FALSE),
+        annotations = list(
+          list(text = sprintf("No rows to plot (rank='%s')", rank_of_interest),
+               xref = "paper", yref = "paper", x = 0.5, y = 0.5,
+               showarrow = FALSE, font = list(size = base_text_pt, family = font_family))
+        ),
+        font = list(family = font_family, size = base_text_pt),
+        margin = list(l = 20, r = 20, t = 60, b = 20)
+      )
+    return(list(data = df_rk, plot = plt))
+  }
+
+  n_pos <- sum(df_rk$T_obs > 0, na.rm = TRUE)
+  n_neg <- sum(df_rk$T_obs < 0, na.rm = TRUE)
+  top_pos <- df_rk |> dplyr::arrange(dplyr::desc(.data$T_obs)) |> dplyr::slice_head(n = min(n_pos_each, n_pos))
+  top_neg <- df_rk |> dplyr::arrange(.data$T_obs)                 |> dplyr::slice_head(n = min(n_neg_each, n_neg))
+
+  df_plot <- dplyr::bind_rows(top_neg, top_pos) |>
+    dplyr::mutate(
+      species_label = .data$feature,
+      species_label = forcats::fct_reorder(.data$species_label, .data$T_obs)
+    )
+
+  g1  <- if (nrow(df_plot)) df_plot$group1[1] else ""
+  g2  <- if (nrow(df_plot)) df_plot$group2[1] else ""
+  des <- if (nrow(df_plot)) df_plot$design[1] else ""
+
   max_neg <- max(abs(df_plot$T_obs[df_plot$T_obs < 0]), na.rm = TRUE)
   max_pos <- max(df_plot$T_obs[df_plot$T_obs > 0], na.rm = TRUE)
   if (!is.finite(max_neg) || max_neg == 0) max_neg <- max(abs(df_plot$T_obs), 1, na.rm = TRUE)
@@ -511,105 +671,125 @@ forest_delta <- function(
   gamma <- 0.85
   df_plot$T_col <- sign(df_plot$T_col) * (abs(df_plot$T_col))^gamma
 
-  # ---- base plot --------------------------------------------------------------
-  p <- ggplot2::ggplot(df_plot, ggplot2::aes(x = .data$T_obs, y = .data$species_label)) +
-    ggplot2::geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.4, alpha = 0.6) +
-    {
-      if (isTRUE(color)) {
-        ggplot2::geom_segment(
-          ggplot2::aes(
-            x = 0, xend = .data$T_obs, y = .data$species_label, yend = .data$species_label,
-            color = .data$T_col
-          ),
-          linewidth = 1, alpha = 0.9, show.legend = FALSE
-        )
-      } else {
-        ggplot2::geom_segment(
-          ggplot2::aes(x = 0, xend = .data$T_obs, y = .data$species_label, yend = .data$species_label),
-          linewidth = 0.8, alpha = 0.85
-        )
-      }
-    } +
-    {
-      if (isTRUE(color)) {
-        ggplot2::geom_point(ggplot2::aes(color = .data$T_col), size = 3.6, show.legend = FALSE)
-      } else {
-        ggplot2::geom_point(size = 2.2)
-      }
-    } +
-    ggplot2::labs(
-      title = sprintf("Top/Bottom raw Stouffer T - rank: %s", rank_of_interest),
-      subtitle = sprintf(
-        "Contrast: %s vs %s (%s); shown: %d neg + %d pos",
-        g1, g2, des, nrow(top_neg), nrow(top_pos)
-      ),
-      x = "Stouffer T (raw)",
-      y = NULL
-    ) +
-    theme_phip()
-
-  if (isTRUE(color)) {
-    p <- p + ggplot2::scale_color_gradientn(
-      colors = c("#1f4e79", "#6f94c2", "#eeeeee", "#e7a39c", "#8e1b10"),
-      values = c(0, 0.25, 0.5, 0.75, 1),
-      limits = c(-1, 1)
-    )
+  if (!"n_peptides_used" %in% names(df_plot)) df_plot$n_peptides_used <- NA_integer_
+  df_plot$padj_hover <- if ("padj_wbh" %in% names(df_plot)) df_plot$padj_wbh else {
+    if ("p_adj_rank" %in% names(df_plot)) df_plot$p_adj_rank else NA_real_
   }
+  df_plot$interpretation <- ifelse(
+    df_plot$T_obs < 0, paste("More in", df_plot$group1),
+    ifelse(df_plot$T_obs > 0, paste("More in", df_plot$group2), "No difference")
+  )
+  hover_text <- sprintf(
+    "Feature: %s<br>n_peptides_used: %s<br>T_obs: %s<br>Interpretation: %s<br>padj_wbh: %s",
+    df_plot$feature,
+    ifelse(is.na(df_plot$n_peptides_used), "NA", format(df_plot$n_peptides_used, big.mark=",")),
+    format(round(df_plot$T_obs, 4), nsmall = 4),
+    df_plot$interpretation,
+    ifelse(is.na(df_plot$padj_hover), "NA", formatC(df_plot$padj_hover, format="e", digits=2))
+  )
 
-  # ---- arrows sized by RAW |T_obs| -------------------------------------------
-  lvl_n <- length(levels(df_plot$species_label))
-  if (lvl_n == 0L) lvl_n <- length(unique(df_plot$species_label))
-  y_top <- lvl_n + y_pad
-
-  maxabs <- max(abs(df_plot$T_obs), na.rm = TRUE)
-  if (!is.finite(maxabs) || maxabs == 0) maxabs <- 1
-
-  x_off <- arrow_frac * maxabs
-  x_left_text <- -x_off - text_gap_frac * maxabs
-  x_right_text <- x_off + text_gap_frac * maxabs
-
-  # rewrite subtitle header to reflect left/right labels
-  if (!is.null(p$labels$subtitle)) {
-    s <- p$labels$subtitle
-    if (grepl("^Contrast:", s)) {
-      s <- sub("^Contrast:\\s*.*?;", paste0("Contrast: ", left_label, " vs ", right_label, ";"), s)
-    } else {
-      s <- paste0("Contrast: ", left_label, " vs ", right_label, "; ", s)
+  map_hex <- local({
+    cols <- c("#1f4e79", "#6f94c2", "#eeeeee", "#e7a39c", "#8e1b10")
+    ramp <- grDevices::colorRampPalette(cols)(256)
+    function(v) {
+      v <- pmax(-1, pmin(1, v))
+      idx <- round(((v + 1) / 2) * 255) + 1
+      ramp[idx]
     }
-    p$labels$subtitle <- s
+  })
+  seg_hex <- if (isTRUE(color)) map_hex(df_plot$T_col) else rep("rgba(0,0,0,0.90)", nrow(df_plot))
+  pt_hex  <- if (isTRUE(color)) map_hex(df_plot$T_col) else rep("rgba(0,0,0,1)",     nrow(df_plot))
+
+  y_levels <- levels(df_plot$species_label)
+  df_plot$species_chr <- as.character(df_plot$species_label)
+
+  plt <- plotly::plot_ly()
+
+  plt <- plotly::layout(
+    plt,
+    shapes = list(
+      list(type = "line", x0 = 0, x1 = 0, xref = "x",
+           y0 = 0, y1 = 1, yref = "paper",
+           line = list(dash = "dash", width = 1, color = "rgba(0,0,0,0.5)"))
+    )
+  )
+
+  if (nrow(df_plot)) {
+    for (i in seq_len(nrow(df_plot))) {
+      plt <- plotly::add_segments(
+        plt,
+        x = 0, xend = df_plot$T_obs[i],
+        y = df_plot$species_chr[i], yend = df_plot$species_chr[i],
+        showlegend = FALSE,
+        hoverinfo = "text",
+        text = hover_text[i],
+        line = list(color = seg_hex[i], width = seg_width),
+        opacity = if (isTRUE(color)) 0.95 else 0.90
+      )
+    }
   }
 
-  p <- p +
-    ggplot2::scale_y_discrete(expand = ggplot2::expansion(mult = c(0.05, 0.10))) +
-    ggplot2::coord_cartesian(clip = "off") +
-    ggplot2::annotate("segment",
-      x = 0, xend = -x_off, y = y_top, yend = y_top,
-      colour = arrow_color, linewidth = arrow_lwd,
-      arrow = ggplot2::arrow(
-        length = grid::unit(arrow_head_cm, "cm"),
-        type = "closed", ends = "last"
-      )
-    ) +
-    ggplot2::annotate("text",
-      x = x_left_text, y = y_top + text_y_offset, label = left_label,
-      size = text_size, colour = arrow_color, fontface = "bold",
-      hjust = 1, vjust = text_vjust
-    ) +
-    ggplot2::annotate("segment",
-      x = 0, xend = x_off, y = y_top, yend = y_top,
-      colour = arrow_color, linewidth = arrow_lwd,
-      arrow = ggplot2::arrow(
-        length = grid::unit(arrow_head_cm, "cm"),
-        type = "closed", ends = "last"
-      )
-    ) +
-    ggplot2::annotate("text",
-      x = x_right_text, y = y_top + text_y_offset, label = right_label,
-      size = text_size, colour = arrow_color, fontface = "bold",
-      hjust = 0, vjust = text_vjust
-    )
+  plt <- plotly::add_markers(
+    plt,
+    x = df_plot$T_obs,
+    y = df_plot$species_chr,
+    showlegend = FALSE,
+    hoverinfo = "text",
+    text = hover_text,
+    marker = list(size = point_size, color = pt_hex, opacity = 1)
+  )
 
-  list(data = df_plot, plot = p)
+  maxabs <- max(abs(df_plot$T_obs), na.rm = TRUE); if (!is.finite(maxabs) || maxabs == 0) maxabs <- 1
+  x_off  <- arrow_frac * maxabs
+  x_left_text  <- -x_off - text_gap_frac * maxabs
+  x_right_text <-  x_off + text_gap_frac * maxabs
+
+  ann_list <- list(
+    list(x = -x_off, y = 1.02, ax = 0, ay = 1.02, xref = "x", yref = "paper",
+         axref = "x", ayref = "paper", showarrow = TRUE, arrowhead = 3,
+         arrowsize = 1.6, arrowwidth = 2.8, arrowcolor = arrow_color),
+    list(x =  x_off, y = 1.02, ax = 0, ay = 1.02, xref = "x", yref = "paper",
+         axref = "x", ayref = "paper", showarrow = TRUE, arrowhead = 3,
+         arrowsize = 1.6, arrowwidth = 2.8, arrowcolor = arrow_color),
+    list(x = x_left_text, y = 1.04, xref = "x", yref = "paper",
+         text = left_label, showarrow = FALSE,
+         font = list(size = round(base_text_pt*1.05), color = arrow_color, family = font_family),
+         xanchor = "right", yanchor = "bottom"),
+    list(x = x_right_text, y = 1.04, xref = "x", yref = "paper",
+         text = right_label, showarrow = FALSE,
+         font = list(size = round(base_text_pt*1.05), color = arrow_color, family = font_family),
+         xanchor = "left", yanchor = "bottom")
+  )
+
+  subtitle_txt <- sprintf("Contrast: %s vs %s (%s); shown: %d neg + %d pos",
+                          g1, g2, des,
+                          sum(df_plot$T_obs < 0, na.rm = TRUE),
+                          sum(df_plot$T_obs > 0, na.rm = TRUE))
+  subtitle_txt <- sub("^Contrast:\\s*.*?;", paste0("Contrast: ", left_label, " vs ", right_label, ";"), subtitle_txt)
+
+  plt <- plotly::layout(
+    plt,
+    title = list(
+      text = paste0("Top/Bottom raw Stouffer T - rank: ", rank_of_interest,
+                    "<br><sub>", subtitle_txt, "</sub>"),
+      font = list(size = round(base_text_pt*1.15), family = font_family)
+    ),
+    xaxis = list(
+      title = "Stouffer T (raw)", zeroline = FALSE, showgrid = isTRUE(show_grid),
+      titlefont = list(size = base_text_pt, family = font_family),
+      tickfont  = list(size = round(base_text_pt*0.9), family = font_family)
+    ),
+    yaxis = list(
+      title = NULL, categoryorder = "array", categoryarray = y_levels,
+      showgrid = isTRUE(show_grid),
+      tickfont = list(size = round(base_text_pt*0.9), family = font_family)
+    ),
+    font = list(family = font_family, size = base_text_pt),
+    margin = list(l = 10 + max(nchar(df_plot$species_chr))*5, r = 10, t = 90, b = 40),
+    annotations = ann_list
+  )
+
+  list(data = df_plot, plot = plt)
 }
 
 # --- small internal helper: white placeholder with red label ------------------
@@ -624,4 +804,222 @@ forest_delta <- function(
     ggplot2::ylim(0, 1) +
     ggplot2::theme_void() +
     ggplot2::theme(panel.background = ggplot2::element_rect(fill = "white", colour = NA))
+}
+
+# ==============================================================================
+# ECDF of per-peptide prevalence for two groups (static)
+# Input: tibble from ph_compute_prevalence() with group1, group2, prop1, prop2
+# Optional: feature, n1/N1/n2/N2, percent1/percent2
+# ==============================================================================
+#' @export
+ecdf_prevalence <- function(
+    d,
+    group_pair = NULL,           # c(g1, g2) to select a specific pair
+    labels     = NULL,           # c(label_g1, label_g2)
+    # styling
+    line_width   = 1.0,
+    line_alpha   = 1.0,
+    color_g1     = "#1f77b4",
+    color_g2     = "#d62728",
+    show_median  = TRUE,
+    show_ks      = TRUE,
+    title        = NULL,
+    subtitle     = NULL,
+    xlab         = NULL,
+    ylab         = NULL
+) {
+  `%||%` <- function(a,b) if (!is.null(a)) a else b
+
+  need <- c("group1","group2","prop1","prop2")
+  miss <- setdiff(need, names(d))
+  if (length(miss)) stop("ecdf_prevalence(): missing columns: ", paste(miss, collapse = ", "))
+
+  # ---- select exactly one pair ----
+  if (!is.null(group_pair)) {
+    if (length(group_pair) != 2L) stop("group_pair must be length-2 vector: c(g1, g2).")
+    d <- d[d$group1 == group_pair[1] & d$group2 == group_pair[2], , drop = FALSE]
+    if (!nrow(d)) stop("No rows for group_pair = c('", group_pair[1], "', '", group_pair[2], "').")
+    g1_raw <- group_pair[1]; g2_raw <- group_pair[2]
+  } else {
+    pairs <- unique(d[, c("group1","group2")])
+    if (nrow(pairs) != 1L) {
+      stop("Multiple (group1, group2) pairs detected. Pass group_pair = c(g1, g2).")
+    }
+    g1_raw <- pairs$group1[1]; g2_raw <- pairs$group2[1]
+  }
+
+  if (is.null(labels)) {
+    g1_lab <- as.character(g1_raw); g2_lab <- as.character(g2_raw)
+  } else {
+    if (length(labels) != 2L) stop("labels must be length-2 vector.")
+    g1_lab <- labels[1]; g2_lab <- labels[2]
+  }
+
+  # ---- data vectors ----
+  x1 <- as.numeric(d$prop1)
+  x2 <- as.numeric(d$prop2)
+  x1 <- x1[is.finite(x1)]
+  x2 <- x2[is.finite(x2)]
+  if (!length(x1) || !length(x2)) stop("No finite prop values to plot.")
+
+  # helper to convert ecdf() to data.frame (step function)
+  ecdf_df <- function(x) {
+    if (!length(x)) return(data.frame(x = numeric(0), y = numeric(0)))
+    xs <- sort(unique(x))
+    F  <- stats::ecdf(x)
+    data.frame(x = xs, y = F(xs))
+  }
+
+  df1 <- ecdf_df(x1); df1$group <- g1_lab
+  df2 <- ecdf_df(x2); df2$group <- g2_lab
+  ec  <- rbind(df1, df2)
+
+  med1 <- stats::median(x1, na.rm = TRUE)
+  med2 <- stats::median(x2, na.rm = TRUE)
+  dmed <- med2 - med1
+
+  ks_txt <- NULL
+  if (isTRUE(show_ks)) {
+    ks <- try(suppressWarnings(stats::ks.test(x1, x2)), silent = TRUE)
+    if (!inherits(ks, "try-error")) {
+      ks_txt <- sprintf("KS D=%.3f  p=%s", unname(ks$statistic), formatC(ks$p.value, format = "e", digits = 2))
+    }
+  }
+
+  p <- ggplot2::ggplot(ec, ggplot2::aes(x, y, color = group)) +
+    ggplot2::geom_step(linewidth = line_width, alpha = line_alpha, direction = "hv") +
+    ggplot2::scale_x_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0,1)) +
+    ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0,1)) +
+    ggplot2::labs(
+      title    = title %||% sprintf("ECDF of per-peptide prevalence (%s vs %s)", g2_lab, g1_lab),
+      subtitle = subtitle %||% if (!is.null(ks_txt)) sprintf("%s | Δ median = %s", ks_txt, scales::percent(dmed, accuracy = 0.1)) else NULL,
+      x        = xlab %||% "Prevalence",
+      y        = ylab %||% "ECDF"
+    ) +
+    ggplot2::scale_color_manual(values = setNames(c(color_g1, color_g2), c(g1_lab, g2_lab))) +
+    ggplot2::theme_classic(base_size = 14) +
+    ggplot2::theme(legend.title = ggplot2::element_blank())
+
+  if (isTRUE(show_median)) {
+    p <- p +
+      ggplot2::geom_vline(xintercept = med1, color = color_g1, linetype = 3) +
+      ggplot2::geom_vline(xintercept = med2, color = color_g2, linetype = 3)
+  }
+
+  p
+}
+
+# ==============================================================================
+# ECDF of per-peptide prevalence for two groups (interactive, plotly)
+# Same input/semantics as ecdf_prevalence()
+# ==============================================================================
+#' @export
+ecdf_prevalence_interactive <- function(
+    d,
+    group_pair = NULL,
+    labels     = NULL,
+    # styling
+    line_width   = 2.0,      # px
+    line_alpha   = 1.0,
+    color_g1     = "#1f77b4",
+    color_g2     = "#d62728",
+    show_median  = TRUE,
+    show_ks      = TRUE,
+    title        = NULL,
+    subtitle     = NULL
+) {
+  `%||%` <- function(a,b) if (!is.null(a)) a else b
+
+  need <- c("group1","group2","prop1","prop2")
+  miss <- setdiff(need, names(d))
+  if (length(miss)) stop("ecdf_prevalence_interactive(): missing columns: ", paste(miss, collapse = ", "))
+
+  # ---- pair ----
+  if (!is.null(group_pair)) {
+    if (length(group_pair) != 2L) stop("group_pair must be length-2 vector: c(g1, g2).")
+    d <- d[d$group1 == group_pair[1] & d$group2 == group_pair[2], , drop = FALSE]
+    if (!nrow(d)) stop("No rows for group_pair = c('", group_pair[1], "', '", group_pair[2], "').")
+    g1_raw <- group_pair[1]; g2_raw <- group_pair[2]
+  } else {
+    pairs <- unique(d[, c("group1","group2")])
+    if (nrow(pairs) != 1L) stop("Multiple (group1, group2) pairs detected. Pass group_pair = c(g1, g2).")
+    g1_raw <- pairs$group1[1]; g2_raw <- pairs$group2[1]
+  }
+
+  if (is.null(labels)) {
+    g1_lab <- as.character(g1_raw); g2_lab <- as.character(g2_raw)
+  } else {
+    if (length(labels) != 2L) stop("labels must be length-2 vector.")
+    g1_lab <- labels[1]; g2_lab <- labels[2]
+  }
+
+  x1 <- as.numeric(d$prop1); x1 <- x1[is.finite(x1)]
+  x2 <- as.numeric(d$prop2); x2 <- x2[is.finite(x2)]
+  if (!length(x1) || !length(x2)) stop("No finite prop values to plot.")
+
+  ecdf_df <- function(x) {
+    xs <- sort(unique(x))
+    F  <- stats::ecdf(x)
+    data.frame(x = xs, y = F(xs))
+  }
+
+  df1 <- ecdf_df(x1)
+  df2 <- ecdf_df(x2)
+  med1 <- stats::median(x1, na.rm = TRUE)
+  med2 <- stats::median(x2, na.rm = TRUE)
+  dmed <- med2 - med1
+
+  ks_txt <- NULL
+  if (isTRUE(show_ks)) {
+    ks <- try(suppressWarnings(stats::ks.test(x1, x2)), silent = TRUE)
+    if (!inherits(ks, "try-error")) {
+      ks_txt <- sprintf("KS D=%.3f  p=%s", unname(ks$statistic), formatC(ks$p.value, format = "e", digits = 2))
+    }
+  }
+
+  # hover formatting
+  fmt_pct <- function(x) scales::percent(x, accuracy = 0.1)
+  hover1 <- sprintf("<b>%s</b><br>x: %s<br>F(x): %s", g1_lab, fmt_pct(df1$x), fmt_pct(df1$y))
+  hover2 <- sprintf("<b>%s</b><br>x: %s<br>F(x): %s", g2_lab, fmt_pct(df2$x), fmt_pct(df2$y))
+
+  plt <- plotly::plot_ly() |>
+    plotly::add_trace(
+      type = "scatter", mode = "lines",
+      x = df1$x, y = df1$y, text = hover1, hoverinfo = "text",
+      line = list(width = line_width, color = color_g1, shape = "hv", opacity = line_alpha),
+      name = g1_lab
+    ) |>
+    plotly::add_trace(
+      type = "scatter", mode = "lines",
+      x = df2$x, y = df2$y, text = hover2, hoverinfo = "text",
+      line = list(width = line_width, color = color_g2, shape = "hv", opacity = line_alpha),
+      name = g2_lab
+    ) |>
+    plotly::layout(
+      title = list(text = htmltools::HTML(
+        paste0(title %||% sprintf("ECDF of per-peptide prevalence ( %s vs %s )", g2_lab, g1_lab),
+               if (!is.null(subtitle) || !is.null(ks_txt)) {
+                 sub <- subtitle %||% ""
+                 km  <- if (!is.null(ks_txt)) sprintf("%s | Δ median = %s", ks_txt, fmt_pct(dmed)) else ""
+                 sprintf("<br><sup>%s%s%s</sup>",
+                         sub, if (nzchar(sub) && nzchar(km)) " — " else "", km)
+               } else "")
+      )),
+      xaxis = list(title = "Prevalence", tickformat = ".0%", range = c(0,1)),
+      yaxis = list(title = "ECDF", tickformat = ".0%", range = c(0,1)),
+      legend = list(orientation = "h", x = 0, y = 1.1),
+      margin = list(l = 60, r = 40, b = 60, t = 70)
+    )
+
+  if (isTRUE(show_median)) {
+    plt <- plt |>
+      plotly::add_segments(x = med1, xend = med1, y = 0, yend = 1,
+                           line = list(dash = "dot", width = 1, color = color_g1),
+                           hoverinfo = "skip", showlegend = FALSE) |>
+      plotly::add_segments(x = med2, xend = med2, y = 0, yend = 1,
+                           line = list(dash = "dot", width = 1, color = color_g2),
+                           hoverinfo = "skip", showlegend = FALSE)
+  }
+
+  plt
 }
