@@ -104,34 +104,35 @@
 #'
 #' @export
 ph_prevalence_shift2 <- function(
-  x, rank_cols, group_cols,
-  exist_col = "exist",
-  interaction = FALSE,
-  combine_cols = NULL,
-  interaction_sep = "::",
-  # permutation options
-  B_permutations = 2000L,
-  seed = 1L,
-  smooth_eps_num = 0.5,
-  smooth_eps_den_mult = 2.0,
-  min_max_prev = 0.0,
-  weight_mode = c("equal", "se_invvar", "n_eff_sqrt"),
-  stat_mode = c("diff", "asin"),
-  prev_strat = c("none", "decile"),
-  winsor_z = 4.0,
-  # parallel
-  parallel = NULL, # integer cores; NULL => auto (1 by default)
-  rank_feature_keep = NULL,
-  peptide_library = NULL,
-  auto_fetch_library = FALSE,
-  # logging
-  log = FALSE,
-  log_file = "ph_prevalence_shift.log",
-  # STREAM/LOG — new arguments
-  stream_path = NULL, # path to RDS multi-object stream (serialize() appends)
-  return_results = TRUE, # read back the stream and return tibble
-  append_stream = FALSE, # if TRUE, don't re-init header in stream
-  fold_change = c("none", "sum", "mean", "max", "median")
+    x, rank_cols, group_cols,
+    exist_col            = "exist",
+    interaction          = FALSE,
+    combine_cols         = NULL,
+    interaction_sep      = "::",
+    # permutation options
+    B_permutations       = 2000L,
+    seed                 = 1L,
+    smooth_eps_num       = 0.5,
+    smooth_eps_den_mult  = 2.0,
+    min_max_prev         = 0.0,
+    weight_mode          = c("equal","se_invvar","n_eff_sqrt"),
+    stat_mode            = c("diff","asin"),
+    prev_strat           = c("none","decile"),
+    winsor_z             = 4.0,
+    # parallel
+    parallel             = NULL,   # integer cores; NULL => auto (1 by default)
+    rank_feature_keep    = NULL,
+    peptide_library      = NULL,
+    auto_fetch_library   = FALSE,
+    # logging
+    log                  = FALSE,
+    log_file             = "ph_prevalence_shift.log",
+    # STREAM/LOG — new arguments
+    stream_path          = NULL,          # path to RDS multi-object stream (serialize() appends)
+    return_results       = TRUE,          # read back the stream and return tibble
+    append_stream        = FALSE,          # if TRUE, don't re-init header in stream
+    fold_change          = c("none","sum","mean","max","median"),
+    cross_prev           = c("none","sum","mean","max","median")
 ) {
   # --- 0) Argument validation ----------------------------------------------------
   chk::chk_character(rank_cols)
@@ -142,13 +143,12 @@ ph_prevalence_shift2 <- function(
   chk::chk_number(B_permutations)
   chk::chk_true(B_permutations >= 100)
   fold_change <- match.arg(fold_change)
+  cross_prev  <- match.arg(cross_prev)
 
   # --- 1) Prepare data once ------------------------------------------------------
   # Required columns from `x`
-  need_cols <- c(
-    "sample_id", "subject_id", "peptide_id", exist_col, group_cols,
-    "fold_change"
-  )
+  need_cols <- c("sample_id","subject_id","peptide_id", exist_col, group_cols)
+  if (!identical(fold_change, "none")) need_cols <- c(need_cols, "fold_change")
   if (inherits(x, "phip_data")) {
     df_long <- x$data_long |>
       dplyr::select(tidyselect::any_of(need_cols))
@@ -631,20 +631,50 @@ ph_prevalence_shift2 <- function(
       }
     }
 
+    # ---- optional cross-contrast prevalence summary (lazy-safe) ----
+    cp_val <- NA_real_
+    if (!identical(cross_prev, "none")) {
+      # peptides in this stratum and subjects in the contrast (both groups)
+      pep_ids_here <- names(pep_col_map)[pep_cols]
+      subj_rows_both <- c(g1_rows, g2_rows)
+      subj_ids_here  <- subjects_order[unique(subj_rows_both)]
+
+      # build per-peptide prevalence pooled over g1 ∪ g2
+      cp_tbl <- df_long |>
+        dplyr::filter(.data$peptide_id %in% pep_ids_here,
+                      .data$subject_id %in% subj_ids_here) |>
+        dplyr::mutate(.exist = !!rlang::sym(exist_col) > 0L) |>
+        dplyr::group_by(.data$peptide_id) |>
+        dplyr::summarise(prev = mean(.exist, na.rm = TRUE), .groups = "drop")
+
+      # summarize prevalence vector by requested reducer
+      if (cross_prev == "sum")   cp_tbl <- dplyr::summarise(cp_tbl, v = sum(.data$prev, na.rm = TRUE))
+      if (cross_prev == "mean")  cp_tbl <- dplyr::summarise(cp_tbl, v = mean(.data$prev, na.rm = TRUE))
+      if (cross_prev == "max")   cp_tbl <- dplyr::summarise(cp_tbl, v = max(.data$prev, na.rm = TRUE))
+      if (cross_prev == "median") {
+        cp_try <- try(dplyr::summarise(cp_tbl, v = median(.data$prev, na.rm = TRUE)), silent = TRUE)
+        cp_tbl <- if (inherits(cp_try, "try-error")) {
+          tibble::tibble(v = stats::median(dplyr::collect(cp_tbl)$prev, na.rm = TRUE))
+        } else cp_try
+      }
+      cp_val <- dplyr::pull(dplyr::collect(cp_tbl), v)[1] %||% NA_real_
+    }
+
     row <- dplyr::bind_cols(
       st[, c("rank", "feature", "group_col", "group1", "group2", "design")],
       tibble::tibble(
         n_subjects_paired = if (identical(st$design, "paired")) as.integer(P) else NA_integer_,
-        n_peptides_used = as.integer(res$n_peptides_used),
-        m_eff = as.numeric(res$m_eff),
-        T_obs = as.numeric(res$T_obs),
-        b = as.integer(res$b),
-        p_perm = as.numeric(res$p_perm),
-        mean_delta = as.numeric(res$mean_delta),
-        frac_delta_pos = as.numeric(res$frac_delta_pos),
-        mean_delta_w = as.numeric(res$mean_delta_w),
-        frac_delta_pos_w = as.numeric(res$frac_delta_pos_w),
-        !!paste0("fold_change_", fold_change) := fc_val
+        n_peptides_used   = as.integer(res$n_peptides_used),
+        m_eff             = as.numeric(res$m_eff),
+        T_obs             = as.numeric(res$T_obs),
+        b                 = as.integer(res$b),
+        p_perm            = as.numeric(res$p_perm),
+        mean_delta        = as.numeric(res$mean_delta),
+        frac_delta_pos    = as.numeric(res$frac_delta_pos),
+        mean_delta_w      = as.numeric(res$mean_delta_w),
+        frac_delta_pos_w  = as.numeric(res$frac_delta_pos_w),
+        !!paste0("fold_change_", fold_change) := fc_val,
+        !!paste0("cross_prev_",  cross_prev)  := cp_val
       )
     )
 
@@ -816,6 +846,7 @@ ph_prevalence_shift2 <- function(
       p_adj_rank,
       mean_delta, frac_delta_pos, mean_delta_w, frac_delta_pos_w,
       dplyr::any_of(paste0("fold_change_", fold_change)),
+      dplyr::any_of(paste0("cross_prev_",  cross_prev)),
       category_rank_bh
     ) %>%
     dplyr::arrange(rank, feature, group_col, group1, group2)
