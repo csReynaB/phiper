@@ -30,7 +30,8 @@ ph_prevalence_shift2(
   stream_path = NULL,
   return_results = TRUE,
   append_stream = FALSE,
-  fold_change = c("none", "sum", "mean", "max", "median")
+  fold_change = c("none", "sum", "mean", "max", "median"),
+  cross_prev = c("none", "sum", "mean", "max", "median")
 )
 }
 \arguments{
