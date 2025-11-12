@@ -7,21 +7,28 @@
 forest_delta(
   x,
   rank_of_interest,
-  n_each = 15,
+  n_each = NULL,
+  n_neg_each = 15,
+  n_pos_each = 15,
   color = FALSE,
-  bh_only = TRUE,
+  filter_significant = "none",
+  sig_level = 0.05,
   add_signed_z_from_p = FALSE,
   left_label = "More in group1",
   right_label = "More in group2",
   arrow_frac = 0.35,
-  text_size = 3.8,
   text_gap_frac = 0.06,
   y_pad = 0.6,
   text_y_offset = 0,
   text_vjust = -0.3,
   arrow_color = "red",
   arrow_lwd = 0.6,
-  arrow_head_cm = 0.3
+  arrow_head_cm = 0.3,
+  base_text_pt = 12,
+  font_family = "Montserrat",
+  seg_width = 1.2,
+  point_size = 3.6,
+  show_grid = FALSE
 )
 }
 \arguments{
@@ -35,8 +42,12 @@ forest_delta(
 \item{color}{Logical; if \code{TRUE}, lines/points are shaded blue (left, T<0) to
 red (right, T>0) with higher contrast; otherwise monochrome.}
 
-\item{bh_only}{Logical; if \code{TRUE} (default) keep only rows with
-\code{category_rank_bh == "significant (BH, per rank)"}.}
+\item{filter_significant}{character; name of the column to filter on, or \code{"none"} to disable filtering.
+if the named column is numeric, rows are kept where \code{col <= sig_level}.
+if the named column is non-numeric (e.g., \code{category_rank_bh}), rows are kept where
+\code{col == "significant (BH, per rank)"}. default: \code{"none"}.}
+
+\item{sig_level}{numeric; significance threshold used when \code{filter_significant} is a numeric column (default 0.05).}
 
 \item{add_signed_z_from_p}{Logical; if \code{TRUE}, computes a signed Z from
 permutation p (\code{sign(T_obs) * qnorm(1 - p_perm/2)}) and returns it in data.}
@@ -46,8 +57,6 @@ permutation p (\code{sign(T_obs) * qnorm(1 - p_perm/2)}) and returns it in data.
 \item{right_label}{Text for the right arrow/side label.}
 
 \item{arrow_frac}{Fraction of max |T_obs| used as half-length of arrows.}
-
-\item{text_size}{Arrow-end label size (ggplot2 size units).}
 
 \item{text_gap_frac}{Horizontal gap for arrow labels beyond arrow tips (fraction of max |T_obs|).}
 
@@ -62,6 +71,8 @@ permutation p (\code{sign(T_obs) * qnorm(1 - p_perm/2)}) and returns it in data.
 \item{arrow_lwd}{Arrow line width.}
 
 \item{arrow_head_cm}{Arrow head length in cm.}
+
+\item{text_size}{Arrow-end label size (ggplot2 size units).}
 }
 \value{
 A list with:
@@ -73,8 +84,8 @@ A list with:
 \description{
 Builds a forest plot for the most extreme DELTA/Stouffer results within a
 chosen rank using the \strong{raw} \code{T_obs} (no division by any SD). Rows can be
-restricted to BH-significant results (per rank). Colors are purely aesthetic
-and do not change geometry.
+optionally filtered by a significance column (e.g., \code{p_adj_rank}, \code{padj_wbh})
+with a user-specified threshold.
 }
 \details{
 \itemize{
@@ -82,12 +93,4 @@ and do not change geometry.
 \item For calibrated inference or cross-figure comparability, prefer permutation
 p-values (optionally expose \code{add_signed_z_from_p=TRUE} for reporting).
 }
-}
-\examples{
-\dontrun{
-out <- forest_delta(res_shift, rank_of_interest = "species",
-                    n_each = 15, color = TRUE)
-out$plot
-}
-
 }

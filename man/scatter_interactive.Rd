@@ -17,7 +17,13 @@ scatter_interactive(
   alpha = 0.05,
   prefer_flags = TRUE,
   color_by = NULL,
-  color_title = NULL
+  color_title = NULL,
+  point_size = 7,
+  point_alpha = 0.85,
+  jitter_width_pp = 0,
+  jitter_height_pp = 0,
+  font_family = NULL,
+  font_size = 12
 )
 }
 \arguments{

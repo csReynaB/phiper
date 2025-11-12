@@ -2,13 +2,9 @@
 % Please edit documentation in R/binary_alpha.R
 \name{compute_alpha_diversity}
 \alias{compute_alpha_diversity}
-\alias{compute_alpha_diversity.phip_data}
-\alias{compute_alpha_diversity.data.frame}
 \title{Compute alpha diversity per sample / group across ranks}
 \usage{
-compute_alpha_diversity(x, ...)
-
-\method{compute_alpha_diversity}{phip_data}(
+compute_alpha_diversity(
   x,
   group_cols = NULL,
   ranks = "peptide_id",
@@ -16,30 +12,18 @@ compute_alpha_diversity(x, ...)
   shannon_log = c("ln", "log2", "log10"),
   carry_cols = NULL,
   group_interaction = FALSE,
-  interaction_sep = " * "
-)
-
-\method{compute_alpha_diversity}{data.frame}(
-  x,
-  group_cols = NULL,
-  ranks = "peptide_id",
-  fc_threshold = NULL,
-  shannon_log = c("ln", "log2", "log10"),
-  carry_cols = NULL,
-  group_interaction = FALSE,
+  interaction_only = FALSE,
   interaction_sep = " * "
 )
 }
 \arguments{
 \item{x}{A \verb{<phip_data>} object or a long \code{data.frame}.}
 
-\item{group_cols}{Character vector of grouping columns, or \code{NULL} for a
-single aggregate (non-facetted) table. \strong{All columns must be present} on
-the input.}
+\item{group_cols}{Character vector of grouping columns, or \code{NULL} for a single
+aggregate (non-facetted) table. All columns must be present on the input.}
 
-\item{ranks}{Character vector of \strong{exact column names} to aggregate by (see
-“What are ranks?”). Typical defaults include \code{"peptide_id"} or taxonomy /
-lineage columns present in your peptide library or data frame.}
+\item{ranks}{Character vector of \strong{exact column names} to aggregate by.
+Typical values: \code{"peptide_id"} or taxonomy/lineage columns.}
 
 \item{fc_threshold}{Numeric or \code{NULL}. If \code{NULL} (default), presence is
 \code{exist > 0}. If numeric, presence is \code{fold_change > fc_threshold}.}
@@ -48,32 +32,35 @@ lineage columns present in your peptide library or data frame.}
 Shannon index (via base change from natural log).}
 
 \item{carry_cols}{Optional character vector of extra columns to carry forward
-into the output if present (e.g., sample metadata already in your table).}
+into the output if present (e.g. sample metadata in your table).}
 
-\item{group_interaction}{Logical; also compute the \strong{interaction} of all
+\item{group_interaction}{Logical; also compute the interaction of all
 \code{group_cols} (default \code{FALSE}).}
+
+\item{interaction_only}{Logical; if \code{TRUE}, return only the interaction table
+(requires \code{group_interaction = TRUE} and at least two \code{group_cols}).}
 
 \item{interaction_sep}{Separator used for the interaction label (default \code{" * "}).}
 }
 \value{
 A \strong{named list} of data frames with S3 class
 \code{"phip_alpha_diversity"}. Each element (per \code{group_col}, plus optional
-interaction or \code{"all_samples"}) contains: \code{sample_id}, the grouping column
-(or \code{group} when \code{group_cols = NULL}), any \code{carry_cols}, and the metrics:
-\code{rank}, \code{richness}, \code{shannon_diversity}, \code{simpson_diversity}.
+interaction or \code{"all_samples"}) contains: \code{rank}, \code{sample_id}, the grouping
+column (or \code{group} when \code{group_cols = NULL}), any \code{carry_cols}, and the
+metrics: \code{richness}, \code{shannon_diversity}, \code{simpson_diversity}.
 }
 \description{
-Computes \strong{richness}, \strong{Shannon}, and \strong{Simpson} diversity
-per sample and grouping variable at one or more \strong{ranks} (columns) that
-describe peptides.
+Computes \strong{richness}, \strong{Shannon}, and \strong{Simpson} diversity per sample and
+per grouping variable at one or more \strong{ranks} (columns describing peptides).
 }
 \details{
-\subsection{What are “ranks” here? Ranks are *the peptide identities or}{
+\subsection{Ranks}{
 
-characteristics you aggregate by. They must be \strong{exact column names}:
+Ranks are the peptide identities or characteristics you aggregate by. They
+must be \strong{exact column names}:
 \itemize{
-\item For \verb{<phip_data>}: columns in the PHIPER peptide library from Vogl Lab
-(e.g., \code{peptide_id}, lineage/taxa fields available in your library).
+\item For \verb{<phip_data>}: columns in the PHIPER peptide library (e.g. \code{peptide_id},
+lineage/taxa fields).
 \item For \code{data.frame}: columns present on your long count table.
 }
 }
@@ -81,48 +68,56 @@ characteristics you aggregate by. They must be \strong{exact column names}:
 \subsection{Presence rule}{
 \itemize{
 \item Default: \code{exist > 0}.
-\item If \code{fc_threshold} is numeric, presence is instead \code{fold_change > fc_threshold}.
+\item If \code{fc_threshold} is numeric, presence is \code{fold_change > fc_threshold}.
 }
 }
 
-\subsection{Grouping & interactions}{
+\subsection{Grouping, interactions, and interaction-only mode}{
 \itemize{
 \item \code{group_cols} can be a character vector; the return value is a \strong{named list}
 of data frames, one per \code{group_col}.
 \item If \code{group_cols = NULL}, a single non-facetted table is returned under the
 name \code{"all_samples"}.
 \item If \code{group_interaction = TRUE} (and you supplied ≥ 2 \code{group_cols}), an
-additional element is computed for the interaction of all group columns, with
-labels joined by \code{interaction_sep}.
+additional element is computed for the interaction of all group columns,
+with labels joined by \code{interaction_sep}.
+\item If \code{interaction_only = TRUE}, you get \strong{only} that interaction element
+(requires \code{group_interaction = TRUE} and at least 2 \code{group_cols}).
 }
 }
 }
 \examples{
 \dontrun{
 # phip_data input — peptide-level diversity by cohort
-out <- compute_alpha_diversity(pd,
-  group_cols = "Cohort",
-  ranks = "peptide_id"
+out <- compute_alpha_diversity(
+  pd, group_cols = "Cohort", ranks = "peptide_id"
 )
 
-# Use ranks present in the peptide library (e.g., lineage/taxa)
-out_taxa <- compute_alpha_diversity(pd,
+# include interaction of multiple grouping variables
+out2 <- compute_alpha_diversity(
+  pd,
   group_cols = c("Cohort", "timepoint"),
   ranks = c("peptide_id", "family", "genus"),
   group_interaction = TRUE
 )
 
-# data.frame input — ranks must be columns in the data
-out_df <- compute_alpha_diversity(df_long,
-  group_cols = NULL,
-  ranks = "peptide_id"
+# interaction only (returns a single element named "Cohort * timepoint")
+out3 <- compute_alpha_diversity(
+  pd,
+  group_cols = c("Cohort", "timepoint"),
+  ranks = "peptide_id",
+  group_interaction = TRUE,
+  interaction_only = TRUE
 )
 
-# Presence via fold-change
-out_fc <- compute_alpha_diversity(pd,
-  group_cols = "Cohort",
-  ranks = "peptide_id",
-  fc_threshold = 1.5
+# data.frame input — ranks must be columns in the data
+out_df <- compute_alpha_diversity(
+  df_long, group_cols = NULL, ranks = "peptide_id"
+)
+
+# presence via fold-change
+out_fc <- compute_alpha_diversity(
+  pd, group_cols = "Cohort", ranks = "peptide_id", fc_threshold = 1.5
 )
 }
 }

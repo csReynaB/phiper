@@ -5,11 +5,9 @@
 \title{Δ prevalence vs pooled prevalence (per peptide)}
 \usage{
 deltaplot_prevalence(
-  prev_tbl,
-  group_col = "Group",
-  value_col = "Prevalence",
-  peptide_col = "peptide_id",
-  group_order = NULL,
+  d,
+  group_pair = NULL,
+  labels = NULL,
   jitter_width = 0.005,
   jitter_height = 0.005,
   point_alpha = 0.25,
@@ -26,19 +24,6 @@ deltaplot_prevalence(
 )
 }
 \arguments{
-\item{prev_tbl}{Long table with at least three columns: \code{peptide_id},
-\code{group_col} (defaults to \code{"Group"}), and \code{value_col} (defaults to \code{"Prevalence"}).}
-
-\item{group_col}{Name of the column with the group labels. Default \code{"Group"}.}
-
-\item{value_col}{Name of the column with prevalence values. Default \code{"Prevalence"}.}
-
-\item{peptide_col}{Name of the peptide id column. Default \code{"peptide_id"}.}
-
-\item{group_order}{Optional character vector of length 2 giving the order
-(c(group1, group2)). If \code{NULL}, the function uses the unique values found
-in \code{group_col} (sorted).}
-
 \item{jitter_width, jitter_height}{Jitter amounts for the points. Defaults 0.005.}
 
 \item{point_alpha}{Point transparency. Default 0.25.}
@@ -57,6 +42,19 @@ in \code{group_col} (sorted).}
 max pooled prevalence in the data. Default 0.97 (near the right edge).}
 
 \item{title, subtitle, xlab, ylab}{Optional plot labels.}
+
+\item{prev_tbl}{Long table with at least three columns: \code{peptide_id},
+\code{group_col} (defaults to \code{"Group"}), and \code{value_col} (defaults to \code{"Prevalence"}).}
+
+\item{group_col}{Name of the column with the group labels. Default \code{"Group"}.}
+
+\item{value_col}{Name of the column with prevalence values. Default \code{"Prevalence"}.}
+
+\item{peptide_col}{Name of the peptide id column. Default \code{"peptide_id"}.}
+
+\item{group_order}{Optional character vector of length 2 giving the order
+(c(group1, group2)). If \code{NULL}, the function uses the unique values found
+in \code{group_col} (sorted).}
 }
 \value{
 A \code{ggplot} object.

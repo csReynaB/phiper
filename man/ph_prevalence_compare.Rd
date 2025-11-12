@@ -18,7 +18,8 @@ ph_prevalence_compare(
   collect = TRUE,
   register_name = NULL,
   pop_k_min = 1L,
-  paired = FALSE
+  paired = FALSE,
+  peptide_library = NULL
 )
 }
 \arguments{
