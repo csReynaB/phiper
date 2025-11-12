@@ -13,6 +13,7 @@ plot_enrichment_counts(
   group_interaction = FALSE,
   interaction_only = FALSE,
   interaction_sep = " * ",
+  annotation_size = 4,
   ...
 )
 }
@@ -38,6 +39,9 @@ all \code{group_cols} (default \code{FALSE}).}
 (requires \code{group_interaction = TRUE} and at least two \code{group_cols}).}
 
 \item{interaction_sep}{Character separator for interaction labels (default \code{" * "}).}
+
+\item{annotation_size}{Numeric; size of the in-plot threshold annotations
+(passed to \code{geom_text(size = ...)}). Typical range 3–6. Default \code{4}.}
 
 \item{...}{Reserved for future extensions; ignored.}
 }
