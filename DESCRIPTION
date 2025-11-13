@@ -58,4 +58,6 @@ Imports:
     tibble,
     vegan,
     Rcpp, 
-    RcppParallel
+    RcppParallel,
+    doParallel,
+    forcats
