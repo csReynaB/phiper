@@ -2736,7 +2736,8 @@ compute_beta_diversity.phip_data <- function(x,
                                              n_threads = max(1L, (if (rlang::is_installed("parallel")) parallel::detectCores() else 1L) - 1L),
                                              method_pcoa = c("joint", "separate_group", "separate_time", "separate_all", "cap"),
                                              neg_correction = c("none", "lingoes", "cailliez"),
-                                             time_force_continuous = FALSE) {
+                                             time_force_continuous = FALSE,
+                                             ...) {
   stopifnot(inherits(x, "phip_data"))
   .data <- rlang::.data
   method_pcoa <- match.arg(method_pcoa)
@@ -2886,7 +2887,8 @@ compute_beta_diversity.data.frame <- function(x,
                                               n_threads = max(1L, (if (rlang::is_installed("parallel")) parallel::detectCores() else 1L) - 1L),
                                               method_pcoa = c("joint", "separate_group", "separate_time", "separate_all", "cap"),
                                               neg_correction = c("none", "lingoes", "cailliez"),
-                                              time_force_continuous = FALSE) {
+                                              time_force_continuous = FALSE,
+                                              ...) {
   tbl <- x
   .data <- rlang::.data
   method_pcoa <- match.arg(method_pcoa)

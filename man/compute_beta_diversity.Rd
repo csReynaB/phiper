@@ -28,7 +28,8 @@ compute_beta_diversity(x, ...)
     1L) - 1L),
   method_pcoa = c("joint", "separate_group", "separate_time", "separate_all", "cap"),
   neg_correction = c("none", "lingoes", "cailliez"),
-  time_force_continuous = FALSE
+  time_force_continuous = FALSE,
+  ...
 )
 
 \method{compute_beta_diversity}{data.frame}(
@@ -51,7 +52,8 @@ compute_beta_diversity(x, ...)
     1L) - 1L),
   method_pcoa = c("joint", "separate_group", "separate_time", "separate_all", "cap"),
   neg_correction = c("none", "lingoes", "cailliez"),
-  time_force_continuous = FALSE
+  time_force_continuous = FALSE,
+  ...
 )
 }
 \arguments{

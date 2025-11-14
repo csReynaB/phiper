@@ -263,8 +263,8 @@ group_by.phip_data <- function(.data, ..., .add = FALSE,
 
 #' @importFrom dplyr distinct
 #' @exportS3Method distinct phip_data
-distinct.phip_data <- function(x, ...) {
-  dplyr::distinct(x$data_long, ...)
+distinct.phip_data <- function(.data, ..., .keep_all = FALSE) {
+  dplyr::distinct(.data$data_long, ..., .keep_all=.keep_all)
 }
 
 #' @importFrom dplyr ungroup
