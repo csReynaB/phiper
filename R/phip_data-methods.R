@@ -1,33 +1,26 @@
-#' @export
-print.phip_data <- function(x, ...) {
-  cat(cli::rule(
-    left  = "<phip_data>",
-    right = paste0("backend: ", x$backend)
-  ), "\n\n")
-
-  # ---- counts preview -------------------------------------------------------
-  prev <- tryCatch(
+#' @exportS3Method head phip_data
+head.phip_data <- function(x, ...) {
+  tryCatch(
     {
       tbl <- x$data_long
       if (inherits(tbl, c("tbl_dbi", "arrow_dplyr_query"))) {
         tbl |>
-          utils::head(5) |>
+          utils::head(...) |>
           dplyr::collect()
       } else {
-        utils::head(tbl, 5)
+        utils::head(tbl, ...)
       }
     },
-    error = function(e) tibble::tibble(.error = "<preview failed>")
+    error = function(e) tibble::tibble(.error = "<head access failed>")
   )
+}
 
-  cat(cli::col_cyan("counts (first 5 rows):"), "\n")
-  print(prev)
+#' @exportS3Method dim phip_data
+dim.phip_data <- function(x) {
+  n_cols  = ncol(x$data_long)
 
-  ## --- size summary ----------------------------------------------------------
-  n_cols <- ncol(x$data_long)
-
-  .data <- rlang::.data ## to silence the R CMD CHECK and lintr
-  n_rows <- tryCatch(
+  .data <- rlang::.data
+  n_rows = tryCatch(
     if (inherits(x$data_long, c("tbl_dbi", "arrow_dplyr_query"))) {
       x$data_long |>
         dplyr::summarise(n = dplyr::n()) |>
@@ -37,10 +30,28 @@ print.phip_data <- function(x, ...) {
     },
     error = function(e) NA_integer_
   )
+
+  c(n_rows, n_cols)
+}
+
+#' @exportS3Method print phip_data
+print.phip_data <- function(x, ...) {
+  cat(cli::rule(
+    left  = "<phip_data>",
+    right = paste0("backend: ", x$backend)
+  ), "\n\n")
+
+  # ---- counts preview -------------------------------------------------------
+  cat(cli::col_cyan("counts (first 5 rows):"), "\n")
+  print(head(x, 5))
+
+  ## --- size summary ----------------------------------------------------------
+  x_dim <- dim(x)
+
   cat("\n")
   cat(sprintf(
     "table size: %s rows x %s columns\n\n",
-    format(n_rows, big.mark = ","), n_cols
+    format(x_dim[1], big.mark = ","), x_dim[2]
   ))
 
   # ---- contrasts ------------------------------------------------------------
@@ -82,6 +93,7 @@ print.phip_data <- function(x, ...) {
     n_cols <- length(colnames(lib))
     extra_nc <- n_cols - length(show_cols)
 
+    .data <- rlang::.data ## to silence the R CMD CHECK and lintr
     n_rows <- tryCatch(
       lib |> dplyr::summarise(n = dplyr::n()) |> dplyr::pull(.data$n),
       error = function(e) NA_integer_
