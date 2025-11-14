@@ -39,5 +39,7 @@ interactive prompt).
 }
 
 \examples{
+\dontrun{
 pd2 <- transform_fold_change_boxcox(pd, by = "big_group")
+}
 }

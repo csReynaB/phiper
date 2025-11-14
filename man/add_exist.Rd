@@ -4,7 +4,7 @@
 \alias{add_exist}
 \title{Ensure an existence flag (all ones) on \code{data_long}}
 \usage{
-add_exist(phip_data, exist_col = "exist", overwrite = FALSE, ...)
+add_exist(phip_data, exist_col = "exist", overwrite = FALSE)
 }
 \arguments{
 \item{phip_data}{A <phip_data> object.}

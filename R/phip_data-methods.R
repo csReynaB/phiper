@@ -1,3 +1,4 @@
+#' @importFrom utils head
 #' @exportS3Method head phip_data
 head.phip_data <- function(x, ...) {
   tryCatch(
@@ -435,8 +436,7 @@ anti_join.phip_data <- function(x, y, ...) {
 #' @export add_exist
 add_exist <- function(phip_data,
                       exist_col = "exist",
-                      overwrite = FALSE,
-                      ...) {
+                      overwrite = FALSE) {
   x <- phip_data
   stopifnot(inherits(x, "phip_data"))
   .data <- rlang::.data

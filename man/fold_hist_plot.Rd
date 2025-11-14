@@ -28,6 +28,8 @@ Generates a histogram of the \code{fold_change} column, with optional per‑grou
 colouring/filling, sampling, and remote‑table friendliness.
 }
 \examples{
+\dontrun{
 fold_hist_plot(pd, by = "big_group", prop = 0.1, bins = 100) +
   facet_wrap(~big_group, nrow = 2)
+}
 }

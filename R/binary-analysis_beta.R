@@ -89,6 +89,7 @@
 #' @param method_pcoa One of `"joint"`, `"separate_group"`, `"separate_time"`,
 #'   `"separate_all"`, `"cap"`. Controls ordination splitting / CAP.
 #' @param neg_correction One of `"none"`, `"lingoes"`, `"cailliez"`.
+#' @inheritDotParams
 #'
 #' @return A **named list** (one element per view or subview) with class
 #'   `"phip_beta_diversity"`. Each element contains:

@@ -17,9 +17,11 @@
 #'
 #' @return A `ggplot` object ready for further layers / faceting.
 #' @examples
+#' \dontrun{
 #' fold_qq_plot(pd, by = c("big_group", "timepoint"), prop = 0.1) +
 #'   facet_wrap(~big_group, nrow = 2) +
 #'   ggpubr::theme_pubr()
+#' }
 #' @export
 fold_qq_plot <- function(pd,
                          by = NULL,
@@ -145,7 +147,9 @@ fold_qq_plot <- function(pd,
 #'         lambdas (tibble).
 #'
 #' @examples
+#' \dontrun{
 #' pd2 <- transform_fold_change_boxcox(pd, by = "big_group")
+#' }
 #' @export
 #' @importFrom MASS boxcox
 transform_fold_boxcox <- function(pd, by = NULL, confirm = interactive()) {
@@ -228,8 +232,10 @@ transform_fold_boxcox <- function(pd, by = NULL, confirm = interactive()) {
 #' @return A `ggplot` object.
 #' @export
 #' @examples
+#' \dontrun{
 #' fold_hist_plot(pd, by = "big_group", prop = 0.1, bins = 100) +
 #'   facet_wrap(~big_group, nrow = 2)
+#' }
 fold_hist_plot <- function(pd,
                            by = NULL,
                            prop = 1,

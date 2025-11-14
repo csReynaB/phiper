@@ -468,7 +468,9 @@ plot_alpha_diversity <- function(
 #' @param quartile_method one of c("exclusive","inclusive","linear"); passed to plotly box (default "exclusive" ~ ggplot).
 #' @return A plotly htmlwidget.
 #' @examples
-#' # plot_alpha_diversity_interactive(df, metric = "richness", group_col = "group")
+#' \dontrun{
+#' plot_alpha_diversity_interactive(df, metric = "richness", group_col = "group")
+#' }
 #' @export
 plot_alpha_diversity_interactive <- function(
     x,
