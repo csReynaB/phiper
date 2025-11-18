@@ -5,4 +5,4 @@ if (Sys.getenv("_R_CHECK_FORCE_SUGGESTS_", "") == "") Sys.setenv("_R_CHECK_FORCE
 if (Sys.getenv("_R_CHECK_CRAN_INCOMING_", "") == "") Sys.setenv("_R_CHECK_CRAN_INCOMING_" = "false")
 cat("check-dir-path=", file.path(getwd(), ("check")), "\n", file = Sys.getenv("GITHUB_OUTPUT"), sep = "", append = TRUE)
 check_results <- rcmdcheck::rcmdcheck(args = (c("--no-manual", "--as-cran")), build_args = (c("--no-manual", "--compact-vignettes=gs+qpdf")
-), error_on = ("warning"), check_dir = ("check"))
+), error_on = ("error"), check_dir = ("check"))
