@@ -249,3 +249,29 @@
 
   cfg
 }
+
+#' @title Path to example PhIP-Seq datasets shipped with phiper
+#'
+#' @param name Character scalar. Name of the example dataset.
+#'   Currently supported: `"phip_mixture"`.
+#'
+#' @return A character scalar with an absolute path to the file.
+#'
+#' @examples
+#' sim_path <- phip_example_path("phip_mixture")
+#' # phip_obj <- phip_convert(sim_path)
+#'
+#' @export
+phip_example_path <- function(name = c("phip_mixture")) {
+  name <- match.arg(name)
+  fname <- switch(
+    name,
+    phip_mixture = "phip_mixture.parquet"
+  )
+
+  path <- system.file("extdata", fname, package = "phiper")
+  if (path == "") {
+    stop("File ", fname, " not found in extdata/", call. = FALSE)
+  }
+  path
+}
