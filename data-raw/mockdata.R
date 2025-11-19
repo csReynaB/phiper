@@ -19,7 +19,22 @@
 # * sample sizes (subjects): A_T1 = 20; A_T2 = 18, B_T1 = 23; B_T2 = 19
 #
 # The data is exported as .parquet. To load it using phiper:
-
+#
+# library(phiper)
+# sim_path <- phip_example_path("phip_mixture")
+#
+# x <- phip_convert(
+#   data_long_path = sim_path,
+#   sample_id      = "sample_id",
+#   peptide_id     = "peptide_id",
+#   subject_id     = "subject_id",
+#   timepoint      = "time",
+#   exist          = "exist",
+#   counts_input   = "counts_control",
+#   counts_hit     = "counts_hits",
+#   fold_change    = "fold_change",
+#   n_cores        = 4
+# )
 
 # setting seed for reproducibility
 set.seed(16783978L)
