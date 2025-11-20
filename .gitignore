@@ -11,6 +11,7 @@ local-data/
 local-cache/
 local-etl/
 check/
+examples/
 *.fastq
 *.csv.gz
 
