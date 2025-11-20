@@ -414,46 +414,9 @@ panel_AB_T1_T2_long <- panel_AB_T1_T2_long |>
   dplyr::arrange(subject_id, time, peptide_id) |>
   dplyr::distinct(subject_id, time, peptide_id, .keep_all = TRUE)
 
-# Saving:
-# it is a little bit tricky, because the phip_convert() functions do not support
-# converting a raw data.frame. Maybe i should add this function but usually the
-# data are so big, you can not really store them in a data.frame, so it made no
-# sense for me at the beginning
-#
-# Therefore i will save the data in inst/extdata and in the R/resolve-paths.R a
-# small helper was defined, to help the user get the absolute path to the
-# dataset without messing with the package installation paths
-
+# Saving
 out_path <- file.path("inst", "extdata", "phip_mixture.parquet")
 arrow::write_parquet(panel_AB_T1_T2_long, out_path)
 
 # reproducibility check
 all.equal(current_seed, .Random.seed)
-
-# The usage would be then:
-# (you have to actually install() the pacakge! It won't work with
-# devtools::load_all())
-#
-# library(phiper)
-# sim_path <- phip_example_path("phip_mixture")
-#
-# x <- phip_convert(
-#   data_long_path = sim_path,
-#   sample_id      = "sample_id",
-#   peptide_id     = "peptide_id",
-#   subject_id     = "subject_id",
-#   timepoint      = "time",
-#   exist          = "exist",
-#   counts_input   = "counts_control",
-#   counts_hit     = "counts_hits",
-#   fold_change    = "fold_change",
-#   n_cores        = 4
-# )
-#
-# y <- compute_alpha_diversity(x,
-#                              group_cols = c("group", "timepoint"),
-#                              group_interaction = TRUE)
-#
-# plot_alpha_diversity(y,
-#                      group_col = "phip_interaction",
-#                      interaction_only = TRUE)
