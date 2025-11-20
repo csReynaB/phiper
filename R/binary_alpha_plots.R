@@ -44,23 +44,22 @@
 #' - A named list of plot objects (when multiple plots are produced).
 #'
 #' @examples
-#' \dontrun{
 #' # per-group plots
-#' p <- plot_enrichment_counts(pd, group_cols = c("Cohort","timepoint"))
+#' pd <- phip_load_example_data()
+#' p <- plot_enrichment_counts(pd, group_cols = c("group","timepoint"))
 #'
 #' # add interaction plot
 #' p2 <- plot_enrichment_counts(pd,
-#'   group_cols = c("Cohort","timepoint"),
+#'   group_cols = c("group","timepoint"),
 #'   group_interaction = TRUE
 #' )
 #'
 #' # interaction only
 #' p3 <- plot_enrichment_counts(pd,
-#'   group_cols = c("Cohort","timepoint"),
+#'   group_cols = c("group","timepoint"),
 #'   group_interaction = TRUE,
 #'   interaction_only = TRUE
 #' )
-#' }
 #' @export
 plot_enrichment_counts <- function(phip_data,
                                    group_cols = NULL,
