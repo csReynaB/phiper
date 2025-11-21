@@ -429,10 +429,8 @@ anti_join.phip_data <- function(x, y, ...) {
 #' @param overwrite If FALSE and the column exists, abort with a phiper-style error.
 #' @return Modified <phip_data> with updated `data_long`.
 #' @examples
-#' \dontrun{
-#' pd <- add_exist(pd) # adds "exist" := 1L
+#' pd <- phip_load_example_data()
 #' pd <- add_exist(pd, overwrite = TRUE) # overwrites if present
-#' }
 #' @export add_exist
 add_exist <- function(phip_data,
                       exist_col = "exist",

@@ -21,8 +21,6 @@ Appends/overwrites a column (default: "exist") filled with 1L on
 the lazy \code{data_long} backend. Preserves laziness; no collection is forced.
 }
 \examples{
-\dontrun{
-pd <- add_exist(pd) # adds "exist" := 1L
+pd <- phip_load_example_data()
 pd <- add_exist(pd, overwrite = TRUE) # overwrites if present
-}
 }
