@@ -40,9 +40,11 @@ Suggests:
     dbplyr,
     duckdb,
     mockery,
+    rprojroot,
     testthat (>= 3.0.0),
     yaml,
-    withr
+    withr,
+    ggpubr
 Config/testthat/edition: 3
 Imports: 
     chk,
@@ -56,8 +58,11 @@ Imports:
     MASS,
     rlang,
     tibble,
+    tidyr,
     vegan,
     Rcpp, 
     RcppParallel,
     doParallel,
-    forcats
+    foreach,
+    forcats,
+    utils
